@@ -1,5 +1,53 @@
 # 更新日志
 
+## [0.2.0] - 2025-11-13
+
+### 新增 - Phase 1-5 完整实现
+- ✨ **智能体系统 (Phase 1)**
+  - Agent 数据模型(名称、描述、系统提示词、默认模型、允许工具、最大步骤数)
+  - AgentRunner 核心逻辑(计划生成、步骤执行、结果记录)
+  - JobRun 和 JobStep 表(任务运行记录和步骤追踪)
+  - 智能体管理 UI(列表、创建、编辑、运行)
+  - 内置智能体(DevOps 助手、知识整理助手、系统巡检助手)
+  - 智能体与 Orchestrator 集成
+
+- ✨ **自动化调度系统 (Phase 2)**
+  - AutomationTask 数据模型(任务名称、触发类型、调度配置)
+  - AutomationScheduler 调度器(间隔调度、Cron 调度、一次性任务)
+  - 支持多种触发器(cron、interval、once、file、process、webhook)
+  - 任务状态跟踪(最后运行时间、运行次数、状态)
+  - 手动触发任务功能
+
+- ✨ **连接器框架 (Phase 3)**
+  - Connector 数据模型(名称、类型、配置、状态)
+  - BaseConnector 抽象基类
+  - HttpConnector 实现(支持 GET/POST/PUT/DELETE)
+  - 连接测试和状态管理
+
+- ✨ **运行观测增强 (Phase 4)**
+  - JobRun 详情页面(基本信息、执行步骤、耗时统计)
+  - JobStep 详细展示(步骤索引、类型、名称、状态、耗时)
+  - 审批决策记录(仅此一次/永久允许/拒绝)
+  - 执行总结和错误信息展示
+
+- ✨ **UI 增强**
+  - 侧边栏新增入口(智能体、运行记录、连接器、自动化)
+  - 智能体管理页面(创建、编辑、列表、运行)
+  - 运行记录页面(Job 列表、详情查看)
+  - 完整的 Agent 配置对话框
+
+### 改进
+- 🔧 数据库扩展支持新表(agents、job_runs、job_steps、automation_tasks、connectors)
+- 🔧 Orchestrator 集成 AgentRunner
+- 🔧 数据库统计信息增加新表计数
+
+### 技术架构
+- **智能体层**: Agent + AgentRunner + JobRun/JobStep
+- **自动化层**: AutomationScheduler + AutomationTask
+- **连接器层**: BaseConnector + HttpConnector
+- **数据层**: SQLAlchemy ORM + 新增5张表
+- **UI层**: PyQt6 + 新增页面组件
+
 ## [0.1.0] - 2025-11-12
 
 ### 新增

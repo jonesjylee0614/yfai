@@ -1,0 +1,126 @@
+# MCP 服务器注册配置
+# 本文件用于声明可用的 MCP Servers
+
+version: "1.0"
+
+servers:
+  # 本地文件服务
+  - id: files-local
+    name: "本地文件服务"
+    type: local
+    endpoint: ws://127.0.0.1:9001
+    auth:
+      type: none
+    capabilities:
+      tools:
+        - fs.read
+        - fs.write
+        - fs.search
+        - fs.list
+        - fs.delete
+    settings:
+      timeout: 30
+      max_retries: 3
+    enabled: false
+    description: "提供本地文件系统操作能力"
+
+  # DevOps 工具集
+  - id: devops-tools
+    name: "DevOps 工具集"
+    type: remote
+    endpoint: wss://mcp.example.com/devops
+    auth:
+      type: bearer
+      token_env: MCP_TOKEN
+    capabilities:
+      tools:
+        - k8s.describe
+        - k8s.logs
+        - jenkins.trigger
+        - jenkins.status
+        - git.clone
+        - git.pull
+        - git.status
+    settings:
+      timeout: 60
+      max_retries: 2
+    enabled: false
+    description: "Kubernetes、Jenkins、Git等DevOps工具"
+
+  # 数据库查询
+  - id: database-tools
+    name: "数据库工具"
+    type: local
+    endpoint: ws://127.0.0.1:9002
+    auth:
+      type: none
+    capabilities:
+      tools:
+        - db.query
+        - db.schema
+        - db.tables
+        - db.export
+    settings:
+      timeout: 120
+      max_retries: 1
+    enabled: false
+    description: "数据库查询和管理工具"
+
+  # Web搜索
+  - id: web-search
+    name: "网络搜索"
+    type: remote
+    endpoint: wss://mcp.example.com/search
+    auth:
+      type: api_key
+      key_env: SEARCH_API_KEY
+    capabilities:
+      tools:
+        - web.search
+        - web.scrape
+        - web.summarize
+    settings:
+      timeout: 30
+      max_retries: 3
+    enabled: false
+    description: "网络搜索和内容抓取"
+
+# 工具权限映射
+permissions:
+  # 只读操作 - 低风险
+  read_only:
+    - fs.read
+    - fs.list
+    - fs.search
+    - db.query
+    - db.schema
+    - db.tables
+    - k8s.describe
+    - k8s.logs
+    - git.status
+    - jenkins.status
+    - web.search
+
+  # 写入操作 - 中等风险
+  write_ops:
+    - fs.write
+    - db.export
+    - git.clone
+    - git.pull
+
+  # 危险操作 - 高风险
+  dangerous_ops:
+    - fs.delete
+    - jenkins.trigger
+    - k8s.apply
+    - k8s.delete
+
+# 默认策略
+default_policy:
+  require_approval_for:
+    - dangerous_ops
+  auto_allow:
+    - read_only
+  prompt_for:
+    - write_ops
+

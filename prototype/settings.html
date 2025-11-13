@@ -1,0 +1,864 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>系统设置</title>
+    <link rel="stylesheet" href="assets/common.css">
+    <style>
+        body {
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* 侧边栏 */
+        .sidebar {
+            width: 60px;
+            background: var(--bg-darker);
+            border-right: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 12px 0;
+            transition: width 0.3s;
+        }
+
+        .sidebar:hover {
+            width: 200px;
+        }
+
+        .sidebar-item {
+            width: 100%;
+            padding: 12px;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            color: var(--text-secondary);
+            text-decoration: none;
+            white-space: nowrap;
+        }
+
+        .sidebar-item:hover {
+            background: var(--bg-light);
+            color: var(--text-primary);
+        }
+
+        .sidebar-item.active {
+            background: var(--bg-light);
+            color: var(--primary-color);
+            border-left: 3px solid var(--primary-color);
+        }
+
+        .sidebar-icon {
+            width: 24px;
+            height: 24px;
+            margin: 0 auto;
+            font-size: 20px;
+        }
+
+        .sidebar:hover .sidebar-icon {
+            margin: 0 12px 0 0;
+        }
+
+        .sidebar-text {
+            display: none;
+            font-size: 14px;
+        }
+
+        .sidebar:hover .sidebar-text {
+            display: inline;
+        }
+
+        /* 主内容区 */
+        .main-container {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+        }
+
+        /* 设置导航 */
+        .settings-nav {
+            width: 240px;
+            background: var(--bg-dark);
+            border-right: 1px solid var(--border-color);
+            overflow-y: auto;
+            padding: 20px;
+        }
+
+        .settings-nav-title {
+            font-size: 12px;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 12px;
+            padding: 0 12px;
+        }
+
+        .settings-nav-item {
+            padding: 10px 12px;
+            border-radius: var(--radius);
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-bottom: 4px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--text-secondary);
+        }
+
+        .settings-nav-item:hover {
+            background: var(--bg-light);
+            color: var(--text-primary);
+        }
+
+        .settings-nav-item.active {
+            background: rgba(24, 144, 255, 0.1);
+            color: var(--primary-color);
+            border-left: 3px solid var(--primary-color);
+        }
+
+        /* 设置内容 */
+        .settings-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 32px 40px;
+        }
+
+        .settings-section {
+            max-width: 800px;
+            margin-bottom: 40px;
+        }
+
+        .section-header {
+            margin-bottom: 24px;
+        }
+
+        .section-title {
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .section-desc {
+            color: var(--text-secondary);
+            font-size: 14px;
+        }
+
+        .setting-item {
+            background: var(--bg-light);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+            padding: 20px;
+            margin-bottom: 16px;
+        }
+
+        .setting-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 12px;
+        }
+
+        .setting-title {
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .setting-desc {
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+
+        .setting-control {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        /* 开关按钮 */
+        .toggle-switch {
+            position: relative;
+            width: 44px;
+            height: 24px;
+            background: var(--border-color);
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .toggle-switch.active {
+            background: var(--primary-color);
+        }
+
+        .toggle-switch::after {
+            content: '';
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            width: 20px;
+            height: 20px;
+            background: white;
+            border-radius: 50%;
+            transition: all 0.3s;
+        }
+
+        .toggle-switch.active::after {
+            left: 22px;
+        }
+
+        /* 表单组 */
+        .form-group {
+            margin-bottom: 16px;
+        }
+
+        .form-label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            font-size: 13px;
+        }
+
+        .form-hint {
+            display: block;
+            margin-top: 4px;
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        /* 按钮组 */
+        .button-group {
+            display: flex;
+            gap: 8px;
+            margin-top: 24px;
+        }
+
+        /* Provider 卡片 */
+        .provider-card {
+            background: var(--bg-darker);
+            border: 2px solid var(--border-color);
+            border-radius: var(--radius);
+            padding: 16px;
+            margin-bottom: 12px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .provider-card:hover {
+            border-color: var(--primary-color);
+        }
+
+        .provider-card.active {
+            border-color: var(--primary-color);
+            background: rgba(24, 144, 255, 0.1);
+        }
+
+        .provider-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .provider-name {
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .provider-models {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-top: 8px;
+        }
+
+        /* 危险区域 */
+        .danger-zone {
+            background: rgba(255, 77, 79, 0.1);
+            border: 1px solid var(--danger-color);
+            border-radius: var(--radius);
+            padding: 20px;
+            margin-top: 40px;
+        }
+
+        .danger-zone-title {
+            color: var(--danger-color);
+            font-weight: 600;
+            margin-bottom: 12px;
+        }
+
+        /* 快捷键列表 */
+        .shortcuts-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 12px;
+        }
+
+        .shortcut-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px;
+            background: var(--bg-darker);
+            border-radius: var(--radius);
+        }
+
+        .shortcut-action {
+            font-size: 13px;
+        }
+
+        .shortcut-keys {
+            display: flex;
+            gap: 4px;
+        }
+
+        .shortcut-key {
+            background: var(--bg-light);
+            padding: 3px 8px;
+            border-radius: 4px;
+            border: 1px solid var(--border-color);
+            font-size: 11px;
+            font-family: monospace;
+        }
+
+        /* MCP 服务器列表 */
+        .mcp-server-list {
+            margin-top: 16px;
+        }
+
+        .mcp-server-item {
+            background: var(--bg-darker);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+            padding: 16px;
+            margin-bottom: 12px;
+        }
+
+        .mcp-server-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .mcp-server-name {
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .mcp-server-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .mcp-server-info {
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+    </style>
+</head>
+<body>
+    <!-- 左侧导航栏 -->
+    <div class="sidebar">
+        <a href="index.html" class="sidebar-item">
+            <span class="sidebar-icon">💬</span>
+            <span class="sidebar-text">对话</span>
+        </a>
+        <a href="tools-sidebar.html" class="sidebar-item">
+            <span class="sidebar-icon">🛠️</span>
+            <span class="sidebar-text">工具</span>
+        </a>
+        <a href="logs.html" class="sidebar-item">
+            <span class="sidebar-icon">📋</span>
+            <span class="sidebar-text">日志</span>
+        </a>
+        <a href="settings.html" class="sidebar-item active">
+            <span class="sidebar-icon">⚙️</span>
+            <span class="sidebar-text">设置</span>
+        </a>
+    </div>
+
+    <!-- 主内容区 -->
+    <div class="main-container">
+        <!-- 设置导航 -->
+        <div class="settings-nav">
+            <div class="settings-nav-title">设置</div>
+            <div class="settings-nav-item active" onclick="showSection('general')">
+                ⚙️ 通用
+            </div>
+            <div class="settings-nav-item" onclick="showSection('providers')">
+                🤖 模型提供商
+            </div>
+            <div class="settings-nav-item" onclick="showSection('mcp')">
+                🔧 MCP 服务
+            </div>
+            <div class="settings-nav-item" onclick="showSection('local')">
+                💻 本地控制
+            </div>
+            <div class="settings-nav-item" onclick="showSection('security')">
+                🔒 安全与审计
+            </div>
+            <div class="settings-nav-item" onclick="showSection('shortcuts')">
+                ⌨️ 快捷键
+            </div>
+            <div class="settings-nav-item" onclick="showSection('about')">
+                ℹ️ 关于
+            </div>
+        </div>
+
+        <!-- 设置内容 -->
+        <div class="settings-content" id="settingsContent">
+            <!-- 通用设置 -->
+            <div class="settings-section" id="section-general">
+                <div class="section-header">
+                    <div class="section-title">⚙️ 通用设置</div>
+                    <div class="section-desc">配置应用的基本行为和外观</div>
+                </div>
+
+                <div class="setting-item">
+                    <div class="setting-header">
+                        <div>
+                            <div class="setting-title">自动保存对话</div>
+                            <div class="setting-desc">自动保存所有对话记录到本地数据库</div>
+                        </div>
+                        <div class="toggle-switch active" onclick="toggleSwitch(this)"></div>
+                    </div>
+                </div>
+
+                <div class="setting-item">
+                    <div class="setting-header">
+                        <div>
+                            <div class="setting-title">流式输出</div>
+                            <div class="setting-desc">实时显示 AI 回复内容</div>
+                        </div>
+                        <div class="toggle-switch active" onclick="toggleSwitch(this)"></div>
+                    </div>
+                </div>
+
+                <div class="setting-item">
+                    <div class="setting-header">
+                        <div>
+                            <div class="setting-title">显示思考过程</div>
+                            <div class="setting-desc">显示 AI 的推理和决策过程</div>
+                        </div>
+                        <div class="toggle-switch" onclick="toggleSwitch(this)"></div>
+                    </div>
+                </div>
+
+                <div class="setting-item">
+                    <div class="form-group">
+                        <label class="form-label">默认超时时间（秒）</label>
+                        <input type="number" value="60" min="10" max="300">
+                        <span class="form-hint">工具调用和命令执行的默认超时时间</span>
+                    </div>
+                </div>
+
+                <div class="setting-item">
+                    <div class="form-group">
+                        <label class="form-label">界面主题</label>
+                        <select>
+                            <option value="dark" selected>深色</option>
+                            <option value="light">浅色</option>
+                            <option value="auto">跟随系统</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 模型提供商设置 -->
+            <div class="settings-section" id="section-providers" style="display: none;">
+                <div class="section-header">
+                    <div class="section-title">🤖 模型提供商</div>
+                    <div class="section-desc">配置和管理 AI 模型提供商</div>
+                </div>
+
+                <div class="provider-card active">
+                    <div class="provider-header">
+                        <div class="provider-name">
+                            <span class="status-indicator status-success"></span>
+                            阿里百炼 (DashScope)
+                        </div>
+                        <span class="tag tag-low">已连接</span>
+                    </div>
+                    <div class="provider-models">
+                        可用模型：Qwen-Plus, Qwen-Max, Qwen-Turbo
+                    </div>
+                </div>
+
+                <div class="provider-card">
+                    <div class="provider-header">
+                        <div class="provider-name">
+                            <span class="status-indicator status-success"></span>
+                            Ollama (本地)
+                        </div>
+                        <span class="tag tag-low">已连接</span>
+                    </div>
+                    <div class="provider-models">
+                        本地模型：Llama 3.1, Qwen 2.5 Coder
+                    </div>
+                </div>
+
+                <div class="setting-item">
+                    <div class="form-group">
+                        <label class="form-label">DashScope API Key</label>
+                        <input type="password" placeholder="sk-xxxxxxxxxxxxxxxx">
+                        <span class="form-hint">从阿里云控制台获取 API Key</span>
+                    </div>
+                </div>
+
+                <div class="setting-item">
+                    <div class="form-group">
+                        <label class="form-label">Ollama 服务地址</label>
+                        <input type="text" value="http://127.0.0.1:11434">
+                        <span class="form-hint">本地 Ollama 服务的地址</span>
+                    </div>
+                </div>
+
+                <div class="setting-item">
+                    <div class="form-group">
+                        <label class="form-label">模型路由策略</label>
+                        <select>
+                            <option value="auto">自动选择</option>
+                            <option value="always_bailian">总是使用百炼</option>
+                            <option value="always_ollama">总是使用 Ollama</option>
+                            <option value="rule_based" selected>基于规则</option>
+                        </select>
+                        <span class="form-hint">决定如何选择使用哪个模型提供商</span>
+                    </div>
+                </div>
+
+                <div class="button-group">
+                    <button class="btn btn-primary">保存配置</button>
+                    <button class="btn btn-secondary">测试连接</button>
+                </div>
+            </div>
+
+            <!-- MCP 服务设置 -->
+            <div class="settings-section" id="section-mcp" style="display: none;">
+                <div class="section-header">
+                    <div class="section-title">🔧 MCP 服务管理</div>
+                    <div class="section-desc">管理 Model Context Protocol 服务器</div>
+                </div>
+
+                <div class="mcp-server-list">
+                    <div class="mcp-server-item">
+                        <div class="mcp-server-header">
+                            <div class="mcp-server-name">
+                                <span class="status-indicator status-success"></span>
+                                files
+                            </div>
+                            <div class="mcp-server-actions">
+                                <button class="btn btn-secondary btn-small">配置</button>
+                                <button class="btn btn-danger btn-small">停止</button>
+                            </div>
+                        </div>
+                        <div class="mcp-server-info">
+                            📡 ws://127.0.0.1:9001 | 3 个工具 | 运行时间: 2小时
+                        </div>
+                    </div>
+
+                    <div class="mcp-server-item">
+                        <div class="mcp-server-header">
+                            <div class="mcp-server-name">
+                                <span class="status-indicator status-success"></span>
+                                devops
+                            </div>
+                            <div class="mcp-server-actions">
+                                <button class="btn btn-secondary btn-small">配置</button>
+                                <button class="btn btn-danger btn-small">停止</button>
+                            </div>
+                        </div>
+                        <div class="mcp-server-info">
+                            📡 wss://mcp.example.com | 5 个工具 | 需要认证
+                        </div>
+                    </div>
+
+                    <div class="mcp-server-item">
+                        <div class="mcp-server-header">
+                            <div class="mcp-server-name">
+                                <span class="status-indicator status-offline"></span>
+                                database
+                            </div>
+                            <div class="mcp-server-actions">
+                                <button class="btn btn-secondary btn-small">配置</button>
+                                <button class="btn btn-success btn-small">启动</button>
+                            </div>
+                        </div>
+                        <div class="mcp-server-info">
+                            📡 未连接 | 配置错误
+                        </div>
+                    </div>
+                </div>
+
+                <div class="button-group">
+                    <button class="btn btn-primary">➕ 添加 MCP 服务器</button>
+                    <button class="btn btn-secondary">📄 导入配置</button>
+                </div>
+            </div>
+
+            <!-- 本地控制设置 -->
+            <div class="settings-section" id="section-local" style="display: none;">
+                <div class="section-header">
+                    <div class="section-title">💻 本地控制能力</div>
+                    <div class="section-desc">配置本地操作的权限和限制</div>
+                </div>
+
+                <div class="setting-item">
+                    <div class="setting-header">
+                        <div>
+                            <div class="setting-title">启用文件操作</div>
+                            <div class="setting-desc">允许读取、搜索和管理文件</div>
+                        </div>
+                        <div class="toggle-switch active" onclick="toggleSwitch(this)"></div>
+                    </div>
+                </div>
+
+                <div class="setting-item">
+                    <div class="setting-header">
+                        <div>
+                            <div class="setting-title">启用脚本执行</div>
+                            <div class="setting-desc">允许执行 PowerShell、Bash 和 Python 脚本</div>
+                        </div>
+                        <div class="toggle-switch active" onclick="toggleSwitch(this)"></div>
+                    </div>
+                </div>
+
+                <div class="setting-item">
+                    <div class="setting-header">
+                        <div>
+                            <div class="setting-title">启用进程管理</div>
+                            <div class="setting-desc">允许查询和管理系统进程</div>
+                        </div>
+                        <div class="toggle-switch" onclick="toggleSwitch(this)"></div>
+                    </div>
+                </div>
+
+                <div class="setting-item">
+                    <div class="form-group">
+                        <label class="form-label">文件访问白名单</label>
+                        <textarea rows="4" placeholder="D:\WorkSpace&#10;C:\Users\Administrator\Desktop">D:\WorkSpace
+C:\Users\Administrator\Desktop</textarea>
+                        <span class="form-hint">每行一个目录路径，仅允许访问这些目录</span>
+                    </div>
+                </div>
+
+                <div class="setting-item">
+                    <div class="form-group">
+                        <label class="form-label">默认 Shell</label>
+                        <select>
+                            <option value="powershell" selected>PowerShell</option>
+                            <option value="cmd">CMD</option>
+                            <option value="bash">Bash (WSL)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="button-group">
+                    <button class="btn btn-primary">保存设置</button>
+                </div>
+            </div>
+
+            <!-- 安全与审计设置 -->
+            <div class="settings-section" id="section-security" style="display: none;">
+                <div class="section-header">
+                    <div class="section-title">🔒 安全与审计</div>
+                    <div class="section-desc">配置安全策略和审计规则</div>
+                </div>
+
+                <div class="setting-item">
+                    <div class="form-group">
+                        <label class="form-label">操作确认阈值</label>
+                        <select>
+                            <option value="none">不确认（危险）</option>
+                            <option value="high">仅高危操作</option>
+                            <option value="medium" selected>中危及以上</option>
+                            <option value="all">所有操作</option>
+                        </select>
+                        <span class="form-hint">需要用户确认的操作级别</span>
+                    </div>
+                </div>
+
+                <div class="setting-item">
+                    <div class="setting-header">
+                        <div>
+                            <div class="setting-title">自动记录所有操作</div>
+                            <div class="setting-desc">记录所有工具调用和命令执行</div>
+                        </div>
+                        <div class="toggle-switch active" onclick="toggleSwitch(this)"></div>
+                    </div>
+                </div>
+
+                <div class="setting-item">
+                    <div class="setting-header">
+                        <div>
+                            <div class="setting-title">敏感信息脱敏</div>
+                            <div class="setting-desc">自动隐藏 API Key、密码等敏感信息</div>
+                        </div>
+                        <div class="toggle-switch active" onclick="toggleSwitch(this)"></div>
+                    </div>
+                </div>
+
+                <div class="setting-item">
+                    <div class="form-group">
+                        <label class="form-label">日志保留天数</label>
+                        <input type="number" value="30" min="1" max="365">
+                        <span class="form-hint">超过此天数的日志将被自动清理</span>
+                    </div>
+                </div>
+
+                <div class="danger-zone">
+                    <div class="danger-zone-title">⚠️ 危险操作</div>
+                    <div class="button-group">
+                        <button class="btn btn-danger" onclick="clearAllLogs()">清空所有日志</button>
+                        <button class="btn btn-danger" onclick="resetSettings()">重置所有设置</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 快捷键设置 -->
+            <div class="settings-section" id="section-shortcuts" style="display: none;">
+                <div class="section-header">
+                    <div class="section-title">⌨️ 快捷键</div>
+                    <div class="section-desc">查看和自定义键盘快捷键</div>
+                </div>
+
+                <div class="shortcuts-list">
+                    <div class="shortcut-item">
+                        <div class="shortcut-action">打开命令面板</div>
+                        <div class="shortcut-keys">
+                            <span class="shortcut-key">Ctrl</span>
+                            <span class="shortcut-key">K</span>
+                        </div>
+                    </div>
+                    <div class="shortcut-item">
+                        <div class="shortcut-action">新建对话</div>
+                        <div class="shortcut-keys">
+                            <span class="shortcut-key">Ctrl</span>
+                            <span class="shortcut-key">N</span>
+                        </div>
+                    </div>
+                    <div class="shortcut-item">
+                        <div class="shortcut-action">发送消息</div>
+                        <div class="shortcut-keys">
+                            <span class="shortcut-key">Enter</span>
+                        </div>
+                    </div>
+                    <div class="shortcut-item">
+                        <div class="shortcut-action">换行</div>
+                        <div class="shortcut-keys">
+                            <span class="shortcut-key">Shift</span>
+                            <span class="shortcut-key">Enter</span>
+                        </div>
+                    </div>
+                    <div class="shortcut-item">
+                        <div class="shortcut-action">PowerShell 命令</div>
+                        <div class="shortcut-keys">
+                            <span class="shortcut-key">Ctrl</span>
+                            <span class="shortcut-key">Shift</span>
+                            <span class="shortcut-key">P</span>
+                        </div>
+                    </div>
+                    <div class="shortcut-item">
+                        <div class="shortcut-action">帮助文档</div>
+                        <div class="shortcut-keys">
+                            <span class="shortcut-key">F1</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 关于 -->
+            <div class="settings-section" id="section-about" style="display: none;">
+                <div class="section-header">
+                    <div class="section-title">ℹ️ 关于</div>
+                    <div class="section-desc">应用信息和系统状态</div>
+                </div>
+
+                <div class="setting-item">
+                    <div style="text-align: center; padding: 20px;">
+                        <div style="font-size: 48px; margin-bottom: 16px;">🤖</div>
+                        <div style="font-size: 24px; font-weight: 600; margin-bottom: 8px;">AI 控制台</div>
+                        <div style="color: var(--text-secondary); margin-bottom: 24px;">版本 1.0.0</div>
+                        <div style="font-size: 14px; color: var(--text-secondary); line-height: 1.8;">
+                            统一接入百炼（DashScope）与本地 Ollama<br>
+                            调用 MCP 工具，控制本地能力<br>
+                            一个窗口，统一调用 AI & 工具 & 本机能力
+                        </div>
+                    </div>
+                </div>
+
+                <div class="setting-item">
+                    <div class="setting-title" style="margin-bottom: 12px;">系统信息</div>
+                    <div class="detail-row">
+                        <div class="detail-label">操作系统：</div>
+                        <div class="detail-value">Windows 11 Pro</div>
+                    </div>
+                    <div class="detail-row">
+                        <div class="detail-label">Python 版本：</div>
+                        <div class="detail-value">3.11.5</div>
+                    </div>
+                    <div class="detail-row">
+                        <div class="detail-label">数据库：</div>
+                        <div class="detail-value">SQLite 3.42.0</div>
+                    </div>
+                    <div class="detail-row">
+                        <div class="detail-label">安装路径：</div>
+                        <div class="detail-value">D:\WorkSpace\aipros\yfai</div>
+                    </div>
+                </div>
+
+                <div class="button-group">
+                    <button class="btn btn-secondary">检查更新</button>
+                    <button class="btn btn-secondary">查看文档</button>
+                    <button class="btn btn-secondary">反馈问题</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="assets/common.js"></script>
+    <script>
+        // 显示设置分区
+        function showSection(sectionId) {
+            // 隐藏所有分区
+            document.querySelectorAll('.settings-section').forEach(section => {
+                section.style.display = 'none';
+            });
+
+            // 显示选中的分区
+            document.getElementById(`section-${sectionId}`).style.display = 'block';
+
+            // 更新导航样式
+            document.querySelectorAll('.settings-nav-item').forEach(item => {
+                item.classList.remove('active');
+            });
+            event.target.classList.add('active');
+        }
+
+        // 切换开关
+        function toggleSwitch(element) {
+            element.classList.toggle('active');
+            Utils.showToast('设置已更新', 'success');
+        }
+
+        // 清空所有日志
+        function clearAllLogs() {
+            Utils.confirm('确定要清空所有日志吗？此操作不可恢复！', () => {
+                Utils.showToast('日志已清空', 'success');
+            });
+        }
+
+        // 重置设置
+        function resetSettings() {
+            Utils.confirm('确定要重置所有设置吗？将恢复到默认配置！', () => {
+                Utils.showToast('设置已重置', 'success');
+            });
+        }
+    </script>
+</body>
+</html>
+

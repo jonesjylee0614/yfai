@@ -1,0 +1,877 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>知识库管理</title>
+    <link rel="stylesheet" href="assets/common.css">
+    <style>
+        body {
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* 侧边栏 */
+        .sidebar {
+            width: 60px;
+            background: var(--bg-darker);
+            border-right: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 12px 0;
+            transition: width 0.3s;
+        }
+
+        .sidebar:hover {
+            width: 200px;
+        }
+
+        .sidebar-item {
+            width: 100%;
+            padding: 12px;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            color: var(--text-secondary);
+            text-decoration: none;
+            white-space: nowrap;
+        }
+
+        .sidebar-item:hover {
+            background: var(--bg-light);
+            color: var(--text-primary);
+        }
+
+        .sidebar-item.active {
+            background: var(--bg-light);
+            color: var(--primary-color);
+            border-left: 3px solid var(--primary-color);
+        }
+
+        .sidebar-icon {
+            width: 24px;
+            height: 24px;
+            margin: 0 auto;
+            font-size: 20px;
+        }
+
+        .sidebar:hover .sidebar-icon {
+            margin: 0 12px 0 0;
+        }
+
+        .sidebar-text {
+            display: none;
+            font-size: 14px;
+        }
+
+        .sidebar:hover .sidebar-text {
+            display: inline;
+        }
+
+        /* 主内容 */
+        .main-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .header {
+            height: 60px;
+            background: var(--bg-dark);
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 20px;
+        }
+
+        .page-title {
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .knowledge-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 24px;
+        }
+
+        .knowledge-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .stat-card {
+            background: var(--bg-light);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+            padding: 20px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 32px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .stat-label {
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+
+        .knowledge-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: 20px;
+        }
+
+        .knowledge-card {
+            background: var(--bg-light);
+            border: 2px solid var(--border-color);
+            border-radius: var(--radius);
+            padding: 20px;
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+
+        .knowledge-card:hover {
+            border-color: var(--primary-color);
+            transform: translateY(-4px);
+            box-shadow: var(--shadow);
+        }
+
+        .knowledge-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+
+        .knowledge-icon {
+            width: 48px;
+            height: 48px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: var(--radius);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            flex-shrink: 0;
+        }
+
+        .knowledge-info {
+            flex: 1;
+        }
+
+        .knowledge-name {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .knowledge-type {
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .knowledge-desc {
+            font-size: 13px;
+            color: var(--text-secondary);
+            line-height: 1.6;
+            margin-bottom: 12px;
+        }
+
+        .knowledge-stats-inline {
+            display: flex;
+            gap: 16px;
+            font-size: 12px;
+            color: var(--text-secondary);
+            padding-top: 12px;
+            border-top: 1px solid var(--border-color);
+            margin-bottom: 12px;
+        }
+
+        .knowledge-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .knowledge-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+        }
+
+        .status-ready {
+            background: rgba(82, 196, 26, 0.2);
+            color: var(--success-color);
+        }
+
+        .status-indexing {
+            background: rgba(250, 173, 20, 0.2);
+            color: var(--warning-color);
+        }
+
+        .status-error {
+            background: rgba(255, 77, 79, 0.2);
+            color: var(--danger-color);
+        }
+
+        .progress-bar {
+            height: 4px;
+            background: var(--bg-darker);
+            border-radius: 2px;
+            overflow: hidden;
+            margin-top: 8px;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: var(--primary-color);
+            transition: width 0.3s;
+        }
+
+        /* 模态框 */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.7);
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+
+        .modal.show {
+            display: flex;
+        }
+
+        .modal-content {
+            background: var(--bg-dark);
+            border-radius: 12px;
+            width: 90%;
+            max-width: 600px;
+            max-height: 90vh;
+            overflow-y: auto;
+            padding: 24px;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+        }
+
+        .modal-title {
+            font-size: 20px;
+            font-weight: 600;
+        }
+
+        .close-btn {
+            cursor: pointer;
+            font-size: 24px;
+            color: var(--text-secondary);
+        }
+
+        .close-btn:hover {
+            color: var(--text-primary);
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+        }
+
+        .form-hint {
+            display: block;
+            margin-top: 4px;
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .file-drop-zone {
+            border: 2px dashed var(--border-color);
+            border-radius: var(--radius);
+            padding: 40px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .file-drop-zone:hover {
+            border-color: var(--primary-color);
+            background: rgba(24, 144, 255, 0.05);
+        }
+
+        .file-drop-icon {
+            font-size: 48px;
+            margin-bottom: 12px;
+            opacity: 0.5;
+        }
+
+        .file-list {
+            margin-top: 12px;
+        }
+
+        .file-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 12px;
+            background: var(--bg-light);
+            border-radius: var(--radius);
+            margin-bottom: 6px;
+        }
+
+        .search-demo-section {
+            background: var(--bg-light);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+            padding: 20px;
+            margin-bottom: 24px;
+        }
+
+        .search-demo-title {
+            font-weight: 600;
+            margin-bottom: 12px;
+        }
+
+        .search-demo-input {
+            width: 100%;
+            padding: 12px;
+            margin-bottom: 12px;
+        }
+
+        .search-results {
+            margin-top: 16px;
+        }
+
+        .search-result-item {
+            padding: 12px;
+            background: var(--bg-darker);
+            border-radius: var(--radius);
+            margin-bottom: 8px;
+        }
+
+        .result-source {
+            font-size: 11px;
+            color: var(--text-secondary);
+            margin-bottom: 6px;
+        }
+
+        .result-content {
+            font-size: 13px;
+            line-height: 1.6;
+        }
+
+        .result-score {
+            display: inline-block;
+            padding: 2px 6px;
+            background: rgba(24, 144, 255, 0.2);
+            color: var(--primary-color);
+            border-radius: 4px;
+            font-size: 11px;
+            margin-left: 8px;
+        }
+    </style>
+</head>
+<body>
+    <!-- 左侧导航栏 -->
+    <div class="sidebar">
+        <a href="index.html" class="sidebar-item">
+            <span class="sidebar-icon">💬</span>
+            <span class="sidebar-text">对话</span>
+        </a>
+        <a href="assistants.html" class="sidebar-item">
+            <span class="sidebar-icon">🤖</span>
+            <span class="sidebar-text">助手</span>
+        </a>
+        <a href="sessions.html" class="sidebar-item">
+            <span class="sidebar-icon">📚</span>
+            <span class="sidebar-text">会话</span>
+        </a>
+        <a href="knowledge.html" class="sidebar-item active">
+            <span class="sidebar-icon">📖</span>
+            <span class="sidebar-text">知识库</span>
+        </a>
+        <a href="tools-sidebar.html" class="sidebar-item">
+            <span class="sidebar-icon">🛠️</span>
+            <span class="sidebar-text">工具</span>
+        </a>
+        <a href="logs.html" class="sidebar-item">
+            <span class="sidebar-icon">📋</span>
+            <span class="sidebar-text">日志</span>
+        </a>
+        <a href="settings.html" class="sidebar-item">
+            <span class="sidebar-icon">⚙️</span>
+            <span class="sidebar-text">设置</span>
+        </a>
+    </div>
+
+    <!-- 主内容区 -->
+    <div class="main-container">
+        <div class="header">
+            <div class="page-title">📖 知识库 (RAG)</div>
+            <div class="header-actions">
+                <button class="btn btn-secondary" onclick="importKnowledge()">📥 导入</button>
+                <button class="btn btn-primary" onclick="openCreateModal()">➕ 创建知识库</button>
+            </div>
+        </div>
+
+        <div class="knowledge-content">
+            <!-- 统计卡片 -->
+            <div class="knowledge-stats">
+                <div class="stat-card">
+                    <div class="stat-value">5</div>
+                    <div class="stat-label">知识库数量</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">1,247</div>
+                    <div class="stat-label">文档片段</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">3.2 GB</div>
+                    <div class="stat-label">总存储空间</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">234</div>
+                    <div class="stat-label">检索次数</div>
+                </div>
+            </div>
+
+            <!-- RAG 搜索演示 -->
+            <div class="search-demo-section">
+                <div class="search-demo-title">🔍 知识库检索测试</div>
+                <input 
+                    type="text" 
+                    class="search-demo-input" 
+                    placeholder="输入问题，从知识库中检索相关内容..." 
+                    oninput="searchKnowledge(this.value)"
+                >
+                <div class="search-results" id="searchResults">
+                    <div style="text-align: center; color: var(--text-secondary); padding: 20px;">
+                        输入问题进行检索
+                    </div>
+                </div>
+            </div>
+
+            <!-- 知识库列表 -->
+            <div class="knowledge-list" id="knowledgeList">
+                <!-- 知识库卡片将动态生成 -->
+            </div>
+        </div>
+    </div>
+
+    <!-- 创建知识库模态框 -->
+    <div class="modal" id="knowledgeModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-title">创建知识库</div>
+                <span class="close-btn" onclick="closeModal()">✖</span>
+            </div>
+
+            <form id="knowledgeForm">
+                <div class="form-group">
+                    <label class="form-label">知识库名称</label>
+                    <input type="text" id="knowledgeName" placeholder="例如：Python 开发文档" required>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">知识库类型</label>
+                    <select id="knowledgeType">
+                        <option value="documents">文档集合</option>
+                        <option value="directory">目录索引</option>
+                        <option value="web">网页爬虫</option>
+                        <option value="database">数据库</option>
+                    </select>
+                    <span class="form-hint">选择知识库的数据来源类型</span>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">描述</label>
+                    <textarea id="knowledgeDesc" rows="3" placeholder="简要描述知识库的内容和用途..."></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">上传文档</label>
+                    <div class="file-drop-zone" onclick="document.getElementById('fileInput').click()">
+                        <div class="file-drop-icon">📁</div>
+                        <div>点击选择文件或拖拽到此处</div>
+                        <div style="font-size: 12px; color: var(--text-secondary); margin-top: 8px;">
+                            支持 .txt, .md, .pdf, .docx 等格式
+                        </div>
+                    </div>
+                    <input type="file" id="fileInput" multiple style="display: none;" onchange="handleFileSelect(event)">
+                    <div class="file-list" id="fileList"></div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">向量模型</label>
+                    <select id="embeddingModel">
+                        <option value="text-embedding-v1">Text Embedding V1 (DashScope)</option>
+                        <option value="bge-large-zh">BGE-Large-ZH (本地)</option>
+                        <option value="m3e-base">M3E-Base (本地)</option>
+                    </select>
+                    <span class="form-hint">用于生成文本向量的模型</span>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">分块策略</label>
+                    <select id="chunkStrategy">
+                        <option value="fixed">固定大小 (512 tokens)</option>
+                        <option value="paragraph">段落分割</option>
+                        <option value="semantic">语义分割</option>
+                    </select>
+                </div>
+
+                <div class="button-group">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal()">取消</button>
+                    <button type="submit" class="btn btn-primary">创建并开始索引</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="assets/common.js"></script>
+    <script>
+        // 测试数据：知识库列表
+        const knowledgeBases = [
+            {
+                id: 1,
+                name: 'Python 官方文档',
+                type: '文档集合',
+                icon: '🐍',
+                desc: 'Python 3.11 官方文档中文版，包含标准库、语言参考和教程。',
+                chunks: 456,
+                size: '128 MB',
+                status: 'ready',
+                lastIndexed: '2025-11-10',
+                embeddingModel: 'BGE-Large-ZH',
+                searchCount: 89
+            },
+            {
+                id: 2,
+                name: '项目技术文档',
+                type: '目录索引',
+                icon: '📚',
+                desc: '公司内部项目的技术文档、设计文档和API文档。',
+                chunks: 234,
+                size: '45 MB',
+                status: 'ready',
+                lastIndexed: '2025-11-12',
+                embeddingModel: 'Text Embedding V1',
+                searchCount: 156
+            },
+            {
+                id: 3,
+                name: 'Kubernetes 运维手册',
+                type: '文档集合',
+                icon: '☸️',
+                desc: 'K8s 运维最佳实践、故障排查指南和配置模板。',
+                chunks: 178,
+                size: '32 MB',
+                status: 'indexing',
+                lastIndexed: '进行中',
+                embeddingModel: 'BGE-Large-ZH',
+                searchCount: 45,
+                indexProgress: 67
+            },
+            {
+                id: 4,
+                name: '技术博客归档',
+                type: '网页爬虫',
+                icon: '📝',
+                desc: '从多个技术博客爬取的文章内容，涵盖前后端、DevOps等。',
+                chunks: 312,
+                size: '156 MB',
+                status: 'ready',
+                lastIndexed: '2025-11-11',
+                embeddingModel: 'M3E-Base',
+                searchCount: 67
+            },
+            {
+                id: 5,
+                name: '代码示例库',
+                type: '目录索引',
+                icon: '💻',
+                desc: '各种编程语言和框架的代码示例和最佳实践。',
+                chunks: 67,
+                size: '23 MB',
+                status: 'ready',
+                lastIndexed: '2025-11-09',
+                embeddingModel: 'Text Embedding V1',
+                searchCount: 34
+            }
+        ];
+
+        // 模拟搜索结果
+        const mockSearchResults = {
+            'python': [
+                {
+                    source: 'Python 官方文档 / 标准库 / collections',
+                    content: 'collections 模块实现了特定目标的容器，以提供 Python 标准内建容器 dict、list、set 和 tuple 的替代选择。其中 namedtuple 是创建命名字段元组的工厂函数...',
+                    score: 0.92
+                },
+                {
+                    source: 'Python 官方文档 / 语言参考 / 数据模型',
+                    content: 'Python 中的所有数据都是由对象或对象间的关系来表示的。每个对象都有标识号、类型和值。对象一旦被创建，它的标识号就不会改变...',
+                    score: 0.85
+                }
+            ],
+            'kubernetes': [
+                {
+                    source: 'Kubernetes 运维手册 / 部署指南',
+                    content: '使用 kubeadm 部署 Kubernetes 集群是最常用的方式。首先需要在所有节点上安装容器运行时（如 containerd），然后安装 kubeadm、kubelet 和 kubectl...',
+                    score: 0.89
+                },
+                {
+                    source: 'Kubernetes 运维手册 / 故障排查',
+                    content: '当 Pod 处于 CrashLoopBackOff 状态时，首先使用 kubectl logs 查看容器日志，然后检查镜像是否正确、环境变量是否配置、资源限制是否合理...',
+                    score: 0.87
+                }
+            ],
+            'react': [
+                {
+                    source: '代码示例库 / React / Hooks',
+                    content: 'useState Hook 允许你在函数组件中添加状态。它返回一个状态值和一个更新状态的函数。调用更新函数不会合并对象，而是替换它...',
+                    score: 0.91
+                }
+            ]
+        };
+
+        // 初始化
+        window.onload = function() {
+            renderKnowledgeBases();
+        };
+
+        // 渲染知识库列表
+        function renderKnowledgeBases() {
+            const container = document.getElementById('knowledgeList');
+            container.innerHTML = '';
+
+            knowledgeBases.forEach(kb => {
+                const card = document.createElement('div');
+                card.className = 'knowledge-card';
+                
+                let statusHtml = '';
+                if (kb.status === 'ready') {
+                    statusHtml = '<span class="knowledge-status status-ready">✓ 就绪</span>';
+                } else if (kb.status === 'indexing') {
+                    statusHtml = `
+                        <span class="knowledge-status status-indexing">⏳ 索引中</span>
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: ${kb.indexProgress}%"></div>
+                        </div>
+                    `;
+                }
+
+                card.innerHTML = `
+                    <div class="knowledge-header">
+                        <div class="knowledge-icon">${kb.icon}</div>
+                        <div class="knowledge-info">
+                            <div class="knowledge-name">${kb.name}</div>
+                            <div class="knowledge-type">${kb.type}</div>
+                        </div>
+                    </div>
+                    <div class="knowledge-desc">${kb.desc}</div>
+                    ${statusHtml}
+                    <div class="knowledge-stats-inline">
+                        <span>📊 ${kb.chunks} 片段</span>
+                        <span>💾 ${kb.size}</span>
+                        <span>🔍 ${kb.searchCount} 次检索</span>
+                    </div>
+                    <div style="font-size: 11px; color: var(--text-secondary); margin-bottom: 12px;">
+                        模型: ${kb.embeddingModel} | 最后索引: ${kb.lastIndexed}
+                    </div>
+                    <div class="knowledge-actions">
+                        <button class="btn btn-primary btn-small" onclick="useKnowledge(${kb.id}); event.stopPropagation();">
+                            使用
+                        </button>
+                        <button class="btn btn-secondary btn-small" onclick="editKnowledge(${kb.id}); event.stopPropagation();">
+                            编辑
+                        </button>
+                        <button class="btn btn-secondary btn-small" onclick="reindex(${kb.id}); event.stopPropagation();">
+                            重新索引
+                        </button>
+                        <button class="btn btn-danger btn-small" onclick="deleteKnowledge(${kb.id}); event.stopPropagation();">
+                            删除
+                        </button>
+                    </div>
+                `;
+                
+                container.appendChild(card);
+            });
+        }
+
+        // 搜索知识库
+        function searchKnowledge(query) {
+            const resultsContainer = document.getElementById('searchResults');
+            
+            if (!query || query.length < 2) {
+                resultsContainer.innerHTML = `
+                    <div style="text-align: center; color: var(--text-secondary); padding: 20px;">
+                        输入问题进行检索
+                    </div>
+                `;
+                return;
+            }
+
+            // 模拟搜索延迟
+            resultsContainer.innerHTML = `
+                <div style="text-align: center; padding: 20px;">
+                    <div class="loading"></div>
+                    <div style="margin-top: 12px; color: var(--text-secondary);">正在检索...</div>
+                </div>
+            `;
+
+            setTimeout(() => {
+                // 简单的关键词匹配
+                let results = [];
+                query = query.toLowerCase();
+                
+                if (query.includes('python') || query.includes('py')) {
+                    results = mockSearchResults.python || [];
+                } else if (query.includes('k8s') || query.includes('kubernetes')) {
+                    results = mockSearchResults.kubernetes || [];
+                } else if (query.includes('react') || query.includes('前端')) {
+                    results = mockSearchResults.react || [];
+                } else {
+                    // 默认返回一些结果
+                    results = mockSearchResults.python.slice(0, 1);
+                }
+
+                if (results.length === 0) {
+                    resultsContainer.innerHTML = `
+                        <div style="text-align: center; color: var(--text-secondary); padding: 20px;">
+                            未找到相关内容
+                        </div>
+                    `;
+                    return;
+                }
+
+                resultsContainer.innerHTML = results.map(result => `
+                    <div class="search-result-item">
+                        <div class="result-source">
+                            📍 ${result.source}
+                            <span class="result-score">相似度 ${(result.score * 100).toFixed(0)}%</span>
+                        </div>
+                        <div class="result-content">${result.content}</div>
+                    </div>
+                `).join('');
+            }, 800);
+        }
+
+        // 打开创建模态框
+        function openCreateModal() {
+            document.getElementById('knowledgeModal').classList.add('show');
+        }
+
+        // 关闭模态框
+        function closeModal() {
+            document.getElementById('knowledgeModal').classList.remove('show');
+        }
+
+        // 处理文件选择
+        function handleFileSelect(event) {
+            const files = Array.from(event.target.files);
+            const fileList = document.getElementById('fileList');
+            
+            fileList.innerHTML = files.map(file => `
+                <div class="file-item">
+                    <span>📄 ${file.name} (${(file.size / 1024).toFixed(1)} KB)</span>
+                    <button class="btn btn-danger btn-small" onclick="removeFile(this)">✖</button>
+                </div>
+            `).join('');
+        }
+
+        // 移除文件
+        function removeFile(btn) {
+            btn.parentElement.remove();
+        }
+
+        // 使用知识库
+        function useKnowledge(id) {
+            const kb = knowledgeBases.find(k => k.id === id);
+            if (kb) {
+                Storage.set('activeKnowledge', kb);
+                Utils.showToast(`已启用知识库: ${kb.name}`, 'success');
+            }
+        }
+
+        // 编辑知识库
+        function editKnowledge(id) {
+            Utils.showToast('编辑功能开发中...', 'info');
+        }
+
+        // 重新索引
+        function reindex(id) {
+            Utils.confirm('确定要重新索引该知识库吗？', () => {
+                Utils.showToast('正在重新索引...', 'info');
+                // 模拟索引过程
+                setTimeout(() => {
+                    Utils.showToast('索引完成', 'success');
+                }, 2000);
+            });
+        }
+
+        // 删除知识库
+        function deleteKnowledge(id) {
+            const kb = knowledgeBases.find(k => k.id === id);
+            Utils.confirm(`确定要删除知识库"${kb.name}"吗？`, () => {
+                const index = knowledgeBases.findIndex(k => k.id === id);
+                knowledgeBases.splice(index, 1);
+                renderKnowledgeBases();
+                Utils.showToast('知识库已删除', 'success');
+            });
+        }
+
+        // 导入知识库
+        function importKnowledge() {
+            Utils.showToast('导入功能开发中...', 'info');
+        }
+
+        // 表单提交
+        document.getElementById('knowledgeForm').onsubmit = function(e) {
+            e.preventDefault();
+            Utils.showToast('正在创建知识库并开始索引...', 'info');
+            closeModal();
+            
+            setTimeout(() => {
+                Utils.showToast('知识库创建成功', 'success');
+            }, 1500);
+        };
+
+        // 点击模态框外部关闭
+        document.getElementById('knowledgeModal').onclick = function(e) {
+            if (e.target === this) {
+                closeModal();
+            }
+        };
+    </script>
+</body>
+</html>
+

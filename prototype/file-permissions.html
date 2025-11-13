@@ -1,0 +1,821 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>文件权限管理</title>
+    <link rel="stylesheet" href="assets/common.css">
+    <style>
+        body {
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* 侧边栏 */
+        .sidebar {
+            width: 200px;
+            background: var(--bg-darker);
+            border-right: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            padding: 12px 0;
+        }
+
+        .sidebar-item {
+            width: 100%;
+            padding: 12px 16px;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            color: var(--text-secondary);
+            text-decoration: none;
+            white-space: nowrap;
+        }
+
+        .sidebar-item:hover {
+            background: var(--bg-light);
+            color: var(--text-primary);
+        }
+
+        .sidebar-item.active {
+            background: var(--bg-light);
+            color: var(--primary-color);
+            border-left: 3px solid var(--primary-color);
+        }
+
+        .sidebar-icon {
+            width: 24px;
+            height: 24px;
+            font-size: 20px;
+            flex-shrink: 0;
+        }
+
+        .sidebar-text {
+            font-size: 14px;
+        }
+
+        /* 主内容区 */
+        .main-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .header {
+            height: 60px;
+            background: var(--bg-dark);
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 20px;
+        }
+
+        .page-title {
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 24px;
+        }
+
+        .section {
+            background: var(--bg-light);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+            padding: 24px;
+            margin-bottom: 24px;
+        }
+
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .section-title {
+            font-size: 16px;
+            font-weight: 600;
+        }
+
+        .section-desc {
+            color: var(--text-secondary);
+            font-size: 13px;
+            margin-bottom: 16px;
+        }
+
+        /* 父目录列表 */
+        .parent-dirs-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .dir-item {
+            background: var(--bg-darker);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+            padding: 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: all 0.3s;
+        }
+
+        .dir-item:hover {
+            border-color: var(--primary-color);
+        }
+
+        .dir-info {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .dir-icon {
+            font-size: 24px;
+        }
+
+        .dir-details {
+            flex: 1;
+        }
+
+        .dir-path {
+            font-weight: 600;
+            margin-bottom: 4px;
+            font-family: 'Consolas', monospace;
+        }
+
+        .dir-meta {
+            font-size: 12px;
+            color: var(--text-secondary);
+            display: flex;
+            gap: 16px;
+        }
+
+        .dir-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        /* 权限规则 */
+        .permission-rules {
+            margin-top: 16px;
+            padding: 16px;
+            background: var(--bg-darker);
+            border-radius: var(--radius);
+        }
+
+        .rule-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px;
+            background: var(--bg-light);
+            border-radius: var(--radius);
+            margin-bottom: 8px;
+        }
+
+        .rule-icon {
+            font-size: 20px;
+        }
+
+        .rule-content {
+            flex: 1;
+        }
+
+        .rule-title {
+            font-weight: 600;
+            margin-bottom: 2px;
+        }
+
+        .rule-desc {
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .toggle-switch {
+            position: relative;
+            width: 44px;
+            height: 24px;
+            background: var(--border-color);
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .toggle-switch.active {
+            background: var(--success-color);
+        }
+
+        .toggle-switch::after {
+            content: '';
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            width: 20px;
+            height: 20px;
+            background: white;
+            border-radius: 50%;
+            transition: all 0.3s;
+        }
+
+        .toggle-switch.active::after {
+            left: 22px;
+        }
+
+        /* 测试工具 */
+        .test-tool {
+            background: var(--bg-darker);
+            padding: 16px;
+            border-radius: var(--radius);
+        }
+
+        .test-input-group {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+
+        .test-input {
+            flex: 1;
+        }
+
+        .test-result {
+            margin-top: 12px;
+            padding: 12px;
+            border-radius: var(--radius);
+            font-family: 'Consolas', monospace;
+            font-size: 13px;
+        }
+
+        .test-result.allowed {
+            background: rgba(82, 196, 26, 0.1);
+            border: 1px solid var(--success-color);
+            color: var(--success-color);
+        }
+
+        .test-result.denied {
+            background: rgba(255, 77, 79, 0.1);
+            border: 1px solid var(--danger-color);
+            color: var(--danger-color);
+        }
+
+        /* 统计卡片 */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .stat-card {
+            background: var(--bg-light);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+            padding: 20px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 32px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .stat-label {
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+
+        /* 代码块 */
+        .code-block {
+            background: var(--bg-darker);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+            padding: 16px;
+            margin: 16px 0;
+            overflow-x: auto;
+        }
+
+        .code-block code {
+            font-family: 'Consolas', monospace;
+            font-size: 13px;
+            color: #a8daff;
+        }
+
+        .warning-box {
+            background: rgba(250, 173, 20, 0.1);
+            border: 1px solid var(--warning-color);
+            border-radius: var(--radius);
+            padding: 12px 16px;
+            margin: 16px 0;
+            display: flex;
+            gap: 12px;
+        }
+
+        .warning-icon {
+            font-size: 20px;
+            color: var(--warning-color);
+        }
+
+        .warning-text {
+            flex: 1;
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+    </style>
+</head>
+<body>
+    <!-- 左侧导航栏 -->
+    <div class="sidebar">
+        <a href="index.html" class="sidebar-item">
+            <span class="sidebar-icon">💬</span>
+            <span class="sidebar-text">对话</span>
+        </a>
+        <a href="assistants.html" class="sidebar-item">
+            <span class="sidebar-icon">🤖</span>
+            <span class="sidebar-text">助手</span>
+        </a>
+        <a href="sessions.html" class="sidebar-item">
+            <span class="sidebar-icon">📚</span>
+            <span class="sidebar-text">会话</span>
+        </a>
+        <a href="knowledge.html" class="sidebar-item">
+            <span class="sidebar-icon">📖</span>
+            <span class="sidebar-text">知识库</span>
+        </a>
+        <a href="tools-sidebar.html" class="sidebar-item">
+            <span class="sidebar-icon">🛠️</span>
+            <span class="sidebar-text">工具</span>
+        </a>
+        <a href="logs.html" class="sidebar-item">
+            <span class="sidebar-icon">📋</span>
+            <span class="sidebar-text">日志</span>
+        </a>
+        <a href="settings.html" class="sidebar-item">
+            <span class="sidebar-icon">⚙️</span>
+            <span class="sidebar-text">设置</span>
+        </a>
+        <div style="flex: 1;"></div>
+        <a href="file-permissions.html" class="sidebar-item active">
+            <span class="sidebar-icon">🔒</span>
+            <span class="sidebar-text">文件权限</span>
+        </a>
+    </div>
+
+    <!-- 主内容区 -->
+    <div class="main-container">
+        <div class="header">
+            <div class="page-title">🔒 文件权限管理</div>
+            <button class="btn btn-primary" onclick="addParentDir()">➕ 添加父目录</button>
+        </div>
+
+        <div class="content">
+            <!-- 统计信息 -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-value">3</div>
+                    <div class="stat-label">授权父目录</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">1,245</div>
+                    <div class="stat-label">可访问文件数</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">89</div>
+                    <div class="stat-label">访问请求（今天）</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">12</div>
+                    <div class="stat-label">被拒绝请求</div>
+                </div>
+            </div>
+
+            <!-- 父目录白名单 -->
+            <div class="section">
+                <div class="section-header">
+                    <div>
+                        <div class="section-title">📁 授权父目录列表</div>
+                        <div class="section-desc">只有这些目录及其子目录下的文件可以被访问</div>
+                    </div>
+                </div>
+
+                <div class="warning-box">
+                    <div class="warning-icon">⚠️</div>
+                    <div class="warning-text">
+                        <strong>安全提示：</strong> 只添加必要的工作目录。避免添加系统目录（如 C:\Windows）或包含敏感信息的目录。
+                    </div>
+                </div>
+
+                <div class="parent-dirs-list" id="parentDirsList">
+                    <!-- 父目录项将动态生成 -->
+                </div>
+            </div>
+
+            <!-- 权限规则 -->
+            <div class="section">
+                <div class="section-header">
+                    <div>
+                        <div class="section-title">🛡️ 权限规则配置</div>
+                        <div class="section-desc">配置文件访问的具体规则和限制</div>
+                    </div>
+                </div>
+
+                <div class="permission-rules">
+                    <div class="rule-item">
+                        <div class="rule-icon">✅</div>
+                        <div class="rule-content">
+                            <div class="rule-title">启用父目录限制</div>
+                            <div class="rule-desc">只允许访问授权父目录下的文件</div>
+                        </div>
+                        <div class="toggle-switch active" onclick="toggleRule(this)"></div>
+                    </div>
+
+                    <div class="rule-item">
+                        <div class="rule-icon">🔗</div>
+                        <div class="rule-content">
+                            <div class="rule-title">跟随符号链接</div>
+                            <div class="rule-desc">允许跟随符号链接访问目标文件</div>
+                        </div>
+                        <div class="toggle-switch" onclick="toggleRule(this)"></div>
+                    </div>
+
+                    <div class="rule-item">
+                        <div class="rule-icon">🚫</div>
+                        <div class="rule-content">
+                            <div class="rule-title">阻止路径遍历</div>
+                            <div class="rule-desc">阻止 ../ 等路径遍历尝试</div>
+                        </div>
+                        <div class="toggle-switch active" onclick="toggleRule(this)"></div>
+                    </div>
+
+                    <div class="rule-item">
+                        <div class="rule-icon">📄</div>
+                        <div class="rule-content">
+                            <div class="rule-title">隐藏文件过滤</div>
+                            <div class="rule-desc">自动过滤以 . 开头的隐藏文件</div>
+                        </div>
+                        <div class="toggle-switch active" onclick="toggleRule(this)"></div>
+                    </div>
+
+                    <div class="rule-item">
+                        <div class="rule-icon">🔒</div>
+                        <div class="rule-content">
+                            <div class="rule-title">只读模式</div>
+                            <div class="rule-desc">所有文件操作都为只读，禁止修改和删除</div>
+                        </div>
+                        <div class="toggle-switch" onclick="toggleRule(this)"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 实现原理 -->
+            <div class="section">
+                <div class="section-header">
+                    <div>
+                        <div class="section-title">💡 实现原理</div>
+                        <div class="section-desc">父目录限制的技术实现方案</div>
+                    </div>
+                </div>
+
+                <div class="code-block">
+                    <code>import os
+from pathlib import Path
+from typing import List
+
+class FilePermissionManager:
+    """文件权限管理器 - 父目录限制"""
+    
+    def __init__(self, parent_dirs: List[str]):
+        # 规范化并存储授权的父目录
+        self.parent_dirs = [
+            os.path.abspath(os.path.normpath(d)) 
+            for d in parent_dirs
+        ]
+    
+    def is_path_allowed(self, file_path: str) -> bool:
+        """检查文件路径是否在授权的父目录下"""
+        # 1. 规范化路径（解析 . 和 ..）
+        abs_path = os.path.abspath(os.path.normpath(file_path))
+        
+        # 2. 解析符号链接（如果启用）
+        # real_path = os.path.realpath(abs_path)
+        
+        # 3. 检查是否在任一父目录下
+        for parent_dir in self.parent_dirs:
+            # 使用 os.path.commonpath 检查是否为子路径
+            try:
+                common = os.path.commonpath([parent_dir, abs_path])
+                if common == parent_dir:
+                    return True
+            except ValueError:
+                # 不同驱动器的路径
+                continue
+        
+        return False
+    
+    def safe_file_operation(self, file_path: str, operation: str):
+        """安全的文件操作包装"""
+        if not self.is_path_allowed(file_path):
+            raise PermissionError(
+                f"Access denied: {file_path} is outside authorized directories"
+            )
+        
+        # 执行实际的文件操作
+        # ...
+
+# 使用示例
+manager = FilePermissionManager([
+    "D:\\WorkSpace",
+    "C:\\Users\\Administrator\\Desktop",
+    "C:\\Projects"
+])
+
+# 测试路径
+print(manager.is_path_allowed("D:\\WorkSpace\\project\\file.txt"))  # True
+print(manager.is_path_allowed("D:\\WorkSpace\\..\\..\\Windows"))   # False
+print(manager.is_path_allowed("C:\\Secrets\\password.txt"))        # False</code>
+                </div>
+
+                <div style="margin-top: 16px;">
+                    <strong>关键技术点：</strong>
+                    <ul style="margin-top: 8px; padding-left: 20px; color: var(--text-secondary);">
+                        <li><code>os.path.abspath()</code> - 获取绝对路径</li>
+                        <li><code>os.path.normpath()</code> - 规范化路径，解析 <code>.</code> 和 <code>..</code></li>
+                        <li><code>os.path.realpath()</code> - 解析符号链接</li>
+                        <li><code>os.path.commonpath()</code> - 检查公共路径前缀</li>
+                        <li>跨平台支持（Windows/Linux/macOS）</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- 路径测试工具 -->
+            <div class="section">
+                <div class="section-header">
+                    <div>
+                        <div class="section-title">🧪 路径访问测试</div>
+                        <div class="section-desc">测试路径是否在授权范围内</div>
+                    </div>
+                </div>
+
+                <div class="test-tool">
+                    <div class="test-input-group">
+                        <input 
+                            type="text" 
+                            class="test-input" 
+                            id="testPath" 
+                            placeholder="输入要测试的文件路径，例如：D:\WorkSpace\project\file.txt"
+                            value="D:\WorkSpace\project\file.txt"
+                        >
+                        <button class="btn btn-primary" onclick="testPath()">测试</button>
+                    </div>
+                    <div id="testResult"></div>
+                </div>
+
+                <div style="margin-top: 16px;">
+                    <strong>测试用例：</strong>
+                    <div style="margin-top: 8px; display: flex; gap: 8px; flex-wrap: wrap;">
+                        <button class="btn btn-secondary btn-small" onclick="quickTest('D:\\WorkSpace\\aipros\\yfai\\main.py')">
+                            合法路径
+                        </button>
+                        <button class="btn btn-secondary btn-small" onclick="quickTest('D:\\WorkSpace\\..\\..\\Windows\\System32')">
+                            路径遍历
+                        </button>
+                        <button class="btn btn-secondary btn-small" onclick="quickTest('C:\\Secrets\\password.txt')">
+                            未授权目录
+                        </button>
+                        <button class="btn btn-secondary btn-small" onclick="quickTest('D:\\WorkSpace\\./project/../test.txt')">
+                            相对路径
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="assets/common.js"></script>
+    <script>
+        // 授权的父目录列表（测试数据）
+        const parentDirs = [
+            {
+                path: 'D:\\WorkSpace',
+                description: '工作项目目录',
+                filesCount: 1024,
+                addedAt: '2025-11-01',
+                lastAccess: '2025-11-12 14:30'
+            },
+            {
+                path: 'C:\\Users\\Administrator\\Desktop',
+                description: '桌面文件',
+                filesCount: 156,
+                addedAt: '2025-10-15',
+                lastAccess: '2025-11-12 10:15'
+            },
+            {
+                path: 'C:\\Projects',
+                description: '项目代码库',
+                filesCount: 65,
+                addedAt: '2025-11-10',
+                lastAccess: '2025-11-11 16:00'
+            }
+        ];
+
+        // 初始化
+        window.onload = function() {
+            renderParentDirs();
+        };
+
+        // 渲染父目录列表
+        function renderParentDirs() {
+            const container = document.getElementById('parentDirsList');
+            container.innerHTML = '';
+
+            parentDirs.forEach((dir, index) => {
+                const item = document.createElement('div');
+                item.className = 'dir-item';
+                item.innerHTML = `
+                    <div class="dir-info">
+                        <div class="dir-icon">📁</div>
+                        <div class="dir-details">
+                            <div class="dir-path">${dir.path}</div>
+                            <div class="dir-meta">
+                                <span>📄 ${dir.filesCount} 个文件</span>
+                                <span>📅 添加于 ${dir.addedAt}</span>
+                                <span>🕐 最后访问 ${dir.lastAccess}</span>
+                            </div>
+                            ${dir.description ? `<div style="font-size: 12px; color: var(--text-secondary); margin-top: 4px;">${dir.description}</div>` : ''}
+                        </div>
+                    </div>
+                    <div class="dir-actions">
+                        <button class="btn btn-secondary btn-small" onclick="browseDir(${index})">
+                            📂 浏览
+                        </button>
+                        <button class="btn btn-secondary btn-small" onclick="editDir(${index})">
+                            ✏️ 编辑
+                        </button>
+                        <button class="btn btn-danger btn-small" onclick="removeDir(${index})">
+                            🗑️ 移除
+                        </button>
+                    </div>
+                `;
+                container.appendChild(item);
+            });
+        }
+
+        // 添加父目录
+        function addParentDir() {
+            const path = prompt('请输入父目录路径：', 'D:\\WorkSpace');
+            if (path) {
+                // 规范化路径
+                const normalizedPath = path.replace(/\//g, '\\');
+                
+                // 检查是否已存在
+                if (parentDirs.some(d => d.path === normalizedPath)) {
+                    Utils.showToast('该目录已存在', 'warning');
+                    return;
+                }
+
+                parentDirs.push({
+                    path: normalizedPath,
+                    description: '',
+                    filesCount: 0,
+                    addedAt: new Date().toISOString().split('T')[0],
+                    lastAccess: '-'
+                });
+
+                renderParentDirs();
+                Utils.showToast('父目录已添加', 'success');
+            }
+        }
+
+        // 浏览目录
+        function browseDir(index) {
+            const dir = parentDirs[index];
+            Utils.showToast(`打开目录浏览器: ${dir.path}`, 'info');
+        }
+
+        // 编辑目录
+        function editDir(index) {
+            const dir = parentDirs[index];
+            const desc = prompt('编辑描述：', dir.description);
+            if (desc !== null) {
+                dir.description = desc;
+                renderParentDirs();
+                Utils.showToast('描述已更新', 'success');
+            }
+        }
+
+        // 移除目录
+        function removeDir(index) {
+            const dir = parentDirs[index];
+            Utils.confirm(`确定要移除父目录"${dir.path}"吗？`, () => {
+                parentDirs.splice(index, 1);
+                renderParentDirs();
+                Utils.showToast('父目录已移除', 'success');
+            });
+        }
+
+        // 切换规则
+        function toggleRule(element) {
+            element.classList.toggle('active');
+            Utils.showToast('规则已更新', 'success');
+        }
+
+        // 测试路径
+        function testPath() {
+            const path = document.getElementById('testPath').value.trim();
+            if (!path) {
+                Utils.showToast('请输入路径', 'warning');
+                return;
+            }
+
+            // 模拟路径检查
+            const result = checkPath(path);
+            
+            const resultDiv = document.getElementById('testResult');
+            if (result.allowed) {
+                resultDiv.className = 'test-result allowed';
+                resultDiv.innerHTML = `
+                    <div>✅ <strong>访问允许</strong></div>
+                    <div style="margin-top: 8px;">
+                        路径: ${result.normalizedPath}<br>
+                        父目录: ${result.parentDir}<br>
+                        相对路径: ${result.relativePath}
+                    </div>
+                `;
+            } else {
+                resultDiv.className = 'test-result denied';
+                resultDiv.innerHTML = `
+                    <div>❌ <strong>访问拒绝</strong></div>
+                    <div style="margin-top: 8px;">
+                        原因: ${result.reason}<br>
+                        路径: ${result.normalizedPath}
+                    </div>
+                `;
+            }
+        }
+
+        // 快速测试
+        function quickTest(path) {
+            document.getElementById('testPath').value = path;
+            testPath();
+        }
+
+        // 检查路径（模拟）
+        function checkPath(path) {
+            // 1. 规范化路径
+            let normalizedPath = path.replace(/\//g, '\\');
+            normalizedPath = normalizedPath.replace(/\\+/g, '\\');
+            
+            // 2. 检查路径遍历
+            if (normalizedPath.includes('..')) {
+                // 解析 ..
+                const parts = normalizedPath.split('\\');
+                const resolved = [];
+                for (const part of parts) {
+                    if (part === '..') {
+                        if (resolved.length > 0) {
+                            resolved.pop();
+                        }
+                    } else if (part && part !== '.') {
+                        resolved.push(part);
+                    }
+                }
+                normalizedPath = resolved.join('\\');
+            }
+
+            // 3. 检查是否在授权父目录下
+            for (const dir of parentDirs) {
+                const parentPath = dir.path.replace(/\\+$/, ''); // 移除尾部斜杠
+                if (normalizedPath.startsWith(parentPath)) {
+                    const relativePath = normalizedPath.substring(parentPath.length).replace(/^\\/, '');
+                    return {
+                        allowed: true,
+                        normalizedPath: normalizedPath,
+                        parentDir: dir.path,
+                        relativePath: relativePath || '(根目录)'
+                    };
+                }
+            }
+
+            // 4. 未找到匹配的父目录
+            return {
+                allowed: false,
+                normalizedPath: normalizedPath,
+                reason: '路径不在任何授权的父目录下'
+            };
+        }
+    </script>
+</body>
+</html>
+

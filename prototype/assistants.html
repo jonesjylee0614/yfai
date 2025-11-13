@@ -1,0 +1,722 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>助手管理</title>
+    <link rel="stylesheet" href="assets/common.css">
+    <style>
+        body {
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* 侧边栏 */
+        .sidebar {
+            width: 60px;
+            background: var(--bg-darker);
+            border-right: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 12px 0;
+            transition: width 0.3s;
+        }
+
+        .sidebar:hover {
+            width: 200px;
+        }
+
+        .sidebar-item {
+            width: 100%;
+            padding: 12px;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            color: var(--text-secondary);
+            text-decoration: none;
+            white-space: nowrap;
+        }
+
+        .sidebar-item:hover {
+            background: var(--bg-light);
+            color: var(--text-primary);
+        }
+
+        .sidebar-item.active {
+            background: var(--bg-light);
+            color: var(--primary-color);
+            border-left: 3px solid var(--primary-color);
+        }
+
+        .sidebar-icon {
+            width: 24px;
+            height: 24px;
+            margin: 0 auto;
+            font-size: 20px;
+        }
+
+        .sidebar:hover .sidebar-icon {
+            margin: 0 12px 0 0;
+        }
+
+        .sidebar-text {
+            display: none;
+            font-size: 14px;
+        }
+
+        .sidebar:hover .sidebar-text {
+            display: inline;
+        }
+
+        /* 主内容 */
+        .main-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .header {
+            height: 60px;
+            background: var(--bg-dark);
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 20px;
+        }
+
+        .page-title {
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .assistants-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 24px;
+        }
+
+        .assistants-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 20px;
+            margin-bottom: 24px;
+        }
+
+        .assistant-card {
+            background: var(--bg-light);
+            border: 2px solid var(--border-color);
+            border-radius: var(--radius);
+            padding: 20px;
+            cursor: pointer;
+            transition: all 0.3s;
+            position: relative;
+        }
+
+        .assistant-card:hover {
+            border-color: var(--primary-color);
+            transform: translateY(-4px);
+            box-shadow: var(--shadow);
+        }
+
+        .assistant-card.active {
+            border-color: var(--primary-color);
+            background: rgba(24, 144, 255, 0.1);
+        }
+
+        .assistant-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+
+        .assistant-avatar {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            flex-shrink: 0;
+        }
+
+        .assistant-info {
+            flex: 1;
+        }
+
+        .assistant-name {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .assistant-role {
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .assistant-desc {
+            font-size: 13px;
+            color: var(--text-secondary);
+            line-height: 1.6;
+            margin-bottom: 12px;
+            display: -webkit-box;
+            -webkit-line-clamp: 3;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        .assistant-tags {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+            margin-bottom: 12px;
+        }
+
+        .assistant-tag {
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            background: rgba(24, 144, 255, 0.2);
+            color: var(--primary-color);
+        }
+
+        .assistant-stats {
+            display: flex;
+            gap: 16px;
+            font-size: 12px;
+            color: var(--text-secondary);
+            padding-top: 12px;
+            border-top: 1px solid var(--border-color);
+        }
+
+        .assistant-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 12px;
+        }
+
+        .create-assistant-card {
+            border: 2px dashed var(--border-color);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 200px;
+        }
+
+        .create-assistant-card:hover {
+            border-color: var(--primary-color);
+            background: rgba(24, 144, 255, 0.05);
+        }
+
+        .create-icon {
+            font-size: 48px;
+            margin-bottom: 12px;
+            opacity: 0.5;
+        }
+
+        .create-text {
+            color: var(--text-secondary);
+            font-size: 14px;
+        }
+
+        /* 模态框 */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.7);
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+
+        .modal.show {
+            display: flex;
+        }
+
+        .modal-content {
+            background: var(--bg-dark);
+            border-radius: 12px;
+            width: 90%;
+            max-width: 600px;
+            max-height: 90vh;
+            overflow-y: auto;
+            padding: 24px;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+        }
+
+        .modal-title {
+            font-size: 20px;
+            font-weight: 600;
+        }
+
+        .close-btn {
+            cursor: pointer;
+            font-size: 24px;
+            color: var(--text-secondary);
+        }
+
+        .close-btn:hover {
+            color: var(--text-primary);
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+        }
+
+        .preset-prompts {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+            margin-top: 12px;
+        }
+
+        .preset-prompt {
+            padding: 12px;
+            background: var(--bg-light);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+            cursor: pointer;
+            transition: all 0.3s;
+            text-align: center;
+        }
+
+        .preset-prompt:hover {
+            border-color: var(--primary-color);
+        }
+
+        .preset-prompt-icon {
+            font-size: 24px;
+            margin-bottom: 4px;
+        }
+
+        .preset-prompt-name {
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <!-- 左侧导航栏 -->
+    <div class="sidebar">
+        <a href="index.html" class="sidebar-item">
+            <span class="sidebar-icon">💬</span>
+            <span class="sidebar-text">对话</span>
+        </a>
+        <a href="assistants.html" class="sidebar-item active">
+            <span class="sidebar-icon">🤖</span>
+            <span class="sidebar-text">助手</span>
+        </a>
+        <a href="sessions.html" class="sidebar-item">
+            <span class="sidebar-icon">📚</span>
+            <span class="sidebar-text">会话</span>
+        </a>
+        <a href="knowledge.html" class="sidebar-item">
+            <span class="sidebar-icon">📖</span>
+            <span class="sidebar-text">知识库</span>
+        </a>
+        <a href="tools-sidebar.html" class="sidebar-item">
+            <span class="sidebar-icon">🛠️</span>
+            <span class="sidebar-text">工具</span>
+        </a>
+        <a href="logs.html" class="sidebar-item">
+            <span class="sidebar-icon">📋</span>
+            <span class="sidebar-text">日志</span>
+        </a>
+        <a href="settings.html" class="sidebar-item">
+            <span class="sidebar-icon">⚙️</span>
+            <span class="sidebar-text">设置</span>
+        </a>
+    </div>
+
+    <!-- 主内容区 -->
+    <div class="main-container">
+        <div class="header">
+            <div class="page-title">🤖 AI 助手</div>
+            <button class="btn btn-primary" onclick="openCreateModal()">➕ 创建助手</button>
+        </div>
+
+        <div class="assistants-content">
+            <div class="assistants-grid" id="assistantsGrid">
+                <!-- 助手卡片将动态生成 -->
+            </div>
+        </div>
+    </div>
+
+    <!-- 创建/编辑助手模态框 -->
+    <div class="modal" id="assistantModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-title" id="modalTitle">创建 AI 助手</div>
+                <span class="close-btn" onclick="closeModal()">✖</span>
+            </div>
+
+            <form id="assistantForm">
+                <div class="form-group">
+                    <label class="form-label">助手名称</label>
+                    <input type="text" id="assistantName" placeholder="例如：Python 编程助手" required>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">角色设定</label>
+                    <select id="assistantRole">
+                        <option value="通用助手">通用助手</option>
+                        <option value="编程助手">编程助手</option>
+                        <option value="写作助手">写作助手</option>
+                        <option value="翻译助手">翻译助手</option>
+                        <option value="分析助手">分析助手</option>
+                        <option value="运维助手">运维助手</option>
+                        <option value="自定义">自定义</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">系统提示词</label>
+                    <textarea id="assistantPrompt" rows="6" placeholder="定义助手的行为、专长和回答风格..."></textarea>
+                    <div class="preset-prompts">
+                        <div class="preset-prompt" onclick="loadPresetPrompt('python')">
+                            <div class="preset-prompt-icon">🐍</div>
+                            <div class="preset-prompt-name">Python 专家</div>
+                        </div>
+                        <div class="preset-prompt" onclick="loadPresetPrompt('writer')">
+                            <div class="preset-prompt-icon">✍️</div>
+                            <div class="preset-prompt-name">文案写作</div>
+                        </div>
+                        <div class="preset-prompt" onclick="loadPresetPrompt('translator')">
+                            <div class="preset-prompt-icon">🌐</div>
+                            <div class="preset-prompt-name">专业翻译</div>
+                        </div>
+                        <div class="preset-prompt" onclick="loadPresetPrompt('devops')">
+                            <div class="preset-prompt-icon">⚙️</div>
+                            <div class="preset-prompt-name">DevOps 工程师</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">描述</label>
+                    <textarea id="assistantDesc" rows="3" placeholder="简短描述助手的功能和用途..."></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">默认模型</label>
+                    <select id="assistantModel">
+                        <option value="qwen-plus">Qwen-Plus (百炼)</option>
+                        <option value="qwen-max">Qwen-Max (百炼)</option>
+                        <option value="llama3.1">Llama 3.1 (Ollama)</option>
+                        <option value="qwen2.5-coder">Qwen 2.5 Coder (Ollama)</option>
+                    </select>
+                </div>
+
+                <div class="button-group">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal()">取消</button>
+                    <button type="submit" class="btn btn-primary">保存</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="assets/common.js"></script>
+    <script>
+        // 助手数据（测试样例）
+        const assistants = [
+            {
+                id: 1,
+                name: 'Python 编程助手',
+                role: '编程助手',
+                avatar: '🐍',
+                desc: '专业的 Python 开发助手，精通 Python 语法、最佳实践、常用库（pandas, numpy, Django等）和代码优化。',
+                prompt: '你是一位资深的 Python 开发专家，拥有 10 年以上的开发经验。你精通 Python 语法、设计模式、性能优化和最佳实践。',
+                tags: ['Python', '编程', '代码审查', '性能优化'],
+                model: 'qwen2.5-coder',
+                usageCount: 156,
+                lastUsed: '2小时前',
+                createdAt: '2025-11-01'
+            },
+            {
+                id: 2,
+                name: '技术写作助手',
+                role: '写作助手',
+                avatar: '✍️',
+                desc: '帮助撰写技术文档、API 文档、用户指南和技术博客。输出清晰、专业、易懂。',
+                prompt: '你是一位专业的技术写作专家，擅长将复杂的技术概念转化为清晰易懂的文档。',
+                tags: ['技术文档', 'Markdown', 'API文档', '博客'],
+                model: 'qwen-plus',
+                usageCount: 89,
+                lastUsed: '1天前',
+                createdAt: '2025-10-28'
+            },
+            {
+                id: 3,
+                name: '中英翻译专家',
+                role: '翻译助手',
+                avatar: '🌐',
+                desc: '精准的中英文双向翻译，保持专业术语准确性，适合技术文档、论文和商务沟通。',
+                prompt: '你是一位专业的中英文翻译专家，精通两种语言的表达习惯和专业术语。',
+                tags: ['翻译', '中英互译', '技术术语'],
+                model: 'qwen-max',
+                usageCount: 234,
+                lastUsed: '30分钟前',
+                createdAt: '2025-10-15'
+            },
+            {
+                id: 4,
+                name: 'DevOps 运维助手',
+                role: '运维助手',
+                avatar: '⚙️',
+                desc: 'Kubernetes、Docker、CI/CD、监控告警等运维问题专家。提供最佳实践和故障排查建议。',
+                prompt: '你是一位经验丰富的 DevOps 工程师，精通容器化、自动化部署、监控和故障排查。',
+                tags: ['DevOps', 'K8s', 'Docker', 'CI/CD'],
+                model: 'qwen-plus',
+                usageCount: 67,
+                lastUsed: '5小时前',
+                createdAt: '2025-11-05'
+            },
+            {
+                id: 5,
+                name: 'SQL 数据分析师',
+                role: '分析助手',
+                avatar: '📊',
+                desc: '擅长 SQL 查询、数据分析和可视化建议。帮助优化查询性能，设计数据模型。',
+                prompt: '你是一位资深的数据分析师，精通 SQL、数据建模和数据可视化。',
+                tags: ['SQL', '数据分析', 'BI', '查询优化'],
+                model: 'qwen-plus',
+                usageCount: 45,
+                lastUsed: '3天前',
+                createdAt: '2025-10-20'
+            },
+            {
+                id: 6,
+                name: '前端开发助手',
+                role: '编程助手',
+                avatar: '🎨',
+                desc: 'React、Vue、TypeScript 前端开发专家。提供组件设计、性能优化和最佳实践建议。',
+                prompt: '你是一位资深的前端开发专家，精通现代前端技术栈和 UI/UX 设计。',
+                tags: ['React', 'Vue', 'TypeScript', 'CSS'],
+                model: 'qwen2.5-coder',
+                usageCount: 123,
+                lastUsed: '6小时前',
+                createdAt: '2025-11-03'
+            }
+        ];
+
+        // 预设提示词
+        const presetPrompts = {
+            python: `你是一位资深的 Python 开发专家，拥有 10 年以上的开发经验。
+
+你的职责：
+- 提供清晰、可维护的 Python 代码
+- 解释复杂概念和最佳实践
+- 进行代码审查和性能优化
+- 推荐合适的库和工具
+
+你的回答风格：
+- 先给出简洁的答案，然后详细解释
+- 提供可运行的代码示例
+- 指出常见陷阱和注意事项
+- 遵循 PEP 8 和 Python 最佳实践`,
+
+            writer: `你是一位专业的技术写作专家，擅长将复杂的技术概念转化为清晰易懂的文档。
+
+你的专长：
+- API 文档和用户指南
+- 技术博客和教程
+- README 和项目说明
+- 技术白皮书
+
+你的写作原则：
+- 结构清晰，层次分明
+- 使用简单明了的语言
+- 提供实际例子和代码示例
+- 面向目标读者调整深度`,
+
+            translator: `你是一位专业的中英文翻译专家，精通两种语言的表达习惯和专业术语。
+
+翻译原则：
+- 准确传达原文含义
+- 保持专业术语的准确性
+- 符合目标语言的表达习惯
+- 保留原文的语气和风格
+
+特别注意：
+- 技术术语保持一致性
+- 代码和命令不翻译
+- 保留原文格式和结构`,
+
+            devops: `你是一位经验丰富的 DevOps 工程师，精通云原生技术栈和自动化运维。
+
+技术栈：
+- Kubernetes、Docker
+- CI/CD（Jenkins、GitLab CI、GitHub Actions）
+- 监控告警（Prometheus、Grafana）
+- 日志管理（ELK、Loki）
+
+你的职责：
+- 设计和优化 CI/CD 流程
+- 解决容器化和编排问题
+- 提供监控和告警方案
+- 进行故障排查和性能调优
+
+你的建议遵循：
+- 安全第一
+- 自动化优先
+- 高可用和容错设计
+- 成本优化`
+        };
+
+        // 初始化
+        window.onload = function() {
+            renderAssistants();
+        };
+
+        // 渲染助手列表
+        function renderAssistants() {
+            const grid = document.getElementById('assistantsGrid');
+            grid.innerHTML = '';
+
+            // 创建新助手卡片
+            const createCard = document.createElement('div');
+            createCard.className = 'assistant-card create-assistant-card';
+            createCard.onclick = openCreateModal;
+            createCard.innerHTML = `
+                <div class="create-icon">➕</div>
+                <div class="create-text">创建新助手</div>
+            `;
+            grid.appendChild(createCard);
+
+            // 渲染现有助手
+            assistants.forEach(assistant => {
+                const card = document.createElement('div');
+                card.className = 'assistant-card';
+                card.innerHTML = `
+                    <div class="assistant-header">
+                        <div class="assistant-avatar">${assistant.avatar}</div>
+                        <div class="assistant-info">
+                            <div class="assistant-name">${assistant.name}</div>
+                            <div class="assistant-role">${assistant.role}</div>
+                        </div>
+                    </div>
+                    <div class="assistant-desc">${assistant.desc}</div>
+                    <div class="assistant-tags">
+                        ${assistant.tags.map(tag => `<span class="assistant-tag">${tag}</span>`).join('')}
+                    </div>
+                    <div class="assistant-stats">
+                        <span>💬 使用 ${assistant.usageCount} 次</span>
+                        <span>🕐 ${assistant.lastUsed}</span>
+                    </div>
+                    <div class="assistant-actions">
+                        <button class="btn btn-primary btn-small" onclick="useAssistant(${assistant.id}); event.stopPropagation();">
+                            开始对话
+                        </button>
+                        <button class="btn btn-secondary btn-small" onclick="editAssistant(${assistant.id}); event.stopPropagation();">
+                            编辑
+                        </button>
+                        <button class="btn btn-danger btn-small" onclick="deleteAssistant(${assistant.id}); event.stopPropagation();">
+                            删除
+                        </button>
+                    </div>
+                `;
+                grid.appendChild(card);
+            });
+        }
+
+        // 打开创建模态框
+        function openCreateModal() {
+            document.getElementById('modalTitle').textContent = '创建 AI 助手';
+            document.getElementById('assistantForm').reset();
+            document.getElementById('assistantModal').classList.add('show');
+        }
+
+        // 关闭模态框
+        function closeModal() {
+            document.getElementById('assistantModal').classList.remove('show');
+        }
+
+        // 加载预设提示词
+        function loadPresetPrompt(type) {
+            document.getElementById('assistantPrompt').value = presetPrompts[type] || '';
+        }
+
+        // 使用助手
+        function useAssistant(id) {
+            const assistant = assistants.find(a => a.id === id);
+            if (assistant) {
+                Storage.set('currentAssistant', assistant);
+                window.location.href = 'index.html';
+            }
+        }
+
+        // 编辑助手
+        function editAssistant(id) {
+            const assistant = assistants.find(a => a.id === id);
+            if (assistant) {
+                document.getElementById('modalTitle').textContent = '编辑助手';
+                document.getElementById('assistantName').value = assistant.name;
+                document.getElementById('assistantRole').value = assistant.role;
+                document.getElementById('assistantPrompt').value = assistant.prompt;
+                document.getElementById('assistantDesc').value = assistant.desc;
+                document.getElementById('assistantModel').value = assistant.model;
+                document.getElementById('assistantModal').classList.add('show');
+            }
+        }
+
+        // 删除助手
+        function deleteAssistant(id) {
+            const assistant = assistants.find(a => a.id === id);
+            Utils.confirm(`确定要删除助手"${assistant.name}"吗？`, () => {
+                const index = assistants.findIndex(a => a.id === id);
+                assistants.splice(index, 1);
+                renderAssistants();
+                Utils.showToast('助手已删除', 'success');
+            });
+        }
+
+        // 表单提交
+        document.getElementById('assistantForm').onsubmit = function(e) {
+            e.preventDefault();
+            const formData = {
+                name: document.getElementById('assistantName').value,
+                role: document.getElementById('assistantRole').value,
+                prompt: document.getElementById('assistantPrompt').value,
+                desc: document.getElementById('assistantDesc').value,
+                model: document.getElementById('assistantModel').value
+            };
+
+            Utils.showToast('助手已保存', 'success');
+            closeModal();
+            // 这里应该保存到后端或本地存储
+        };
+
+        // 点击模态框外部关闭
+        document.getElementById('assistantModal').onclick = function(e) {
+            if (e.target === this) {
+                closeModal();
+            }
+        };
+    </script>
+</body>
+</html>
+

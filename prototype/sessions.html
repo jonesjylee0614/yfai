@@ -1,0 +1,748 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>会话管理</title>
+    <link rel="stylesheet" href="assets/common.css">
+    <style>
+        body {
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* 侧边栏样式（复用） */
+        .sidebar {
+            width: 60px;
+            background: var(--bg-darker);
+            border-right: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 12px 0;
+            transition: width 0.3s;
+        }
+
+        .sidebar:hover {
+            width: 200px;
+        }
+
+        .sidebar-item {
+            width: 100%;
+            padding: 12px;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            color: var(--text-secondary);
+            text-decoration: none;
+            white-space: nowrap;
+        }
+
+        .sidebar-item:hover {
+            background: var(--bg-light);
+            color: var(--text-primary);
+        }
+
+        .sidebar-item.active {
+            background: var(--bg-light);
+            color: var(--primary-color);
+            border-left: 3px solid var(--primary-color);
+        }
+
+        .sidebar-icon {
+            width: 24px;
+            height: 24px;
+            margin: 0 auto;
+            font-size: 20px;
+        }
+
+        .sidebar:hover .sidebar-icon {
+            margin: 0 12px 0 0;
+        }
+
+        .sidebar-text {
+            display: none;
+            font-size: 14px;
+        }
+
+        .sidebar:hover .sidebar-text {
+            display: inline;
+        }
+
+        /* 主内容区 */
+        .main-container {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+        }
+
+        /* 会话列表 */
+        .sessions-sidebar {
+            width: 320px;
+            background: var(--bg-dark);
+            border-right: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .sessions-header {
+            padding: 16px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .search-box {
+            margin-bottom: 12px;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 8px 12px;
+        }
+
+        .filter-tabs {
+            display: flex;
+            gap: 8px;
+        }
+
+        .filter-tab {
+            flex: 1;
+            padding: 6px;
+            text-align: center;
+            border-radius: var(--radius);
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.3s;
+            color: var(--text-secondary);
+        }
+
+        .filter-tab.active {
+            background: var(--primary-color);
+            color: white;
+        }
+
+        .sessions-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 8px;
+        }
+
+        .session-group {
+            margin-bottom: 16px;
+        }
+
+        .session-group-title {
+            font-size: 12px;
+            color: var(--text-secondary);
+            padding: 8px 12px;
+            text-transform: uppercase;
+        }
+
+        .session-item {
+            padding: 12px;
+            background: var(--bg-light);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+            margin-bottom: 6px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .session-item:hover {
+            border-color: var(--primary-color);
+            transform: translateX(4px);
+        }
+
+        .session-item.active {
+            border-color: var(--primary-color);
+            background: rgba(24, 144, 255, 0.1);
+        }
+
+        .session-item-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 6px;
+        }
+
+        .session-title {
+            font-weight: 600;
+            font-size: 14px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            flex: 1;
+        }
+
+        .session-preview {
+            font-size: 12px;
+            color: var(--text-secondary);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            margin-bottom: 6px;
+        }
+
+        .session-meta {
+            display: flex;
+            justify-content: space-between;
+            font-size: 11px;
+            color: var(--text-secondary);
+        }
+
+        /* 会话详情 */
+        .session-detail {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .detail-header {
+            padding: 16px 20px;
+            background: var(--bg-dark);
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .detail-title {
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .detail-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .detail-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+        }
+
+        .session-info-card {
+            background: var(--bg-light);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 16px;
+        }
+
+        .info-item {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .info-label {
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .info-value {
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .messages-preview {
+            background: var(--bg-light);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+            padding: 16px;
+        }
+
+        .preview-title {
+            font-weight: 600;
+            margin-bottom: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .message-preview-item {
+            padding: 12px;
+            background: var(--bg-darker);
+            border-radius: var(--radius);
+            margin-bottom: 8px;
+        }
+
+        .message-preview-header {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-bottom: 6px;
+        }
+
+        .message-preview-content {
+            font-size: 13px;
+            color: var(--text-primary);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            display: -webkit-box;
+            -webkit-line-clamp: 3;
+            -webkit-box-orient: vertical;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 80px 20px;
+            color: var(--text-secondary);
+        }
+
+        .empty-icon {
+            font-size: 64px;
+            margin-bottom: 16px;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+
+        .stat-card {
+            background: var(--bg-light);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+            padding: 16px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 28px;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .stat-label {
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+    </style>
+</head>
+<body>
+    <!-- 左侧导航栏 -->
+    <div class="sidebar">
+        <a href="index.html" class="sidebar-item">
+            <span class="sidebar-icon">💬</span>
+            <span class="sidebar-text">对话</span>
+        </a>
+        <a href="assistants.html" class="sidebar-item">
+            <span class="sidebar-icon">🤖</span>
+            <span class="sidebar-text">助手</span>
+        </a>
+        <a href="sessions.html" class="sidebar-item active">
+            <span class="sidebar-icon">📚</span>
+            <span class="sidebar-text">会话</span>
+        </a>
+        <a href="knowledge.html" class="sidebar-item">
+            <span class="sidebar-icon">📖</span>
+            <span class="sidebar-text">知识库</span>
+        </a>
+        <a href="tools-sidebar.html" class="sidebar-item">
+            <span class="sidebar-icon">🛠️</span>
+            <span class="sidebar-text">工具</span>
+        </a>
+        <a href="logs.html" class="sidebar-item">
+            <span class="sidebar-icon">📋</span>
+            <span class="sidebar-text">日志</span>
+        </a>
+        <a href="settings.html" class="sidebar-item">
+            <span class="sidebar-icon">⚙️</span>
+            <span class="sidebar-text">设置</span>
+        </a>
+    </div>
+
+    <!-- 会话列表 -->
+    <div class="sessions-sidebar">
+        <div class="sessions-header">
+            <div class="search-box">
+                <input type="text" class="search-input" placeholder="搜索会话..." oninput="searchSessions(this.value)">
+            </div>
+            <div class="filter-tabs">
+                <div class="filter-tab active" onclick="filterSessions('all')">全部</div>
+                <div class="filter-tab" onclick="filterSessions('today')">今天</div>
+                <div class="filter-tab" onclick="filterSessions('week')">本周</div>
+            </div>
+        </div>
+        <div class="sessions-list" id="sessionsList">
+            <!-- 会话列表将动态生成 -->
+        </div>
+    </div>
+
+    <!-- 会话详情 -->
+    <div class="session-detail">
+        <div class="detail-header">
+            <div class="detail-title" id="detailTitle">选择一个会话查看详情</div>
+            <div class="detail-actions">
+                <button class="btn btn-secondary btn-small" onclick="exportSession()" id="exportBtn" disabled>
+                    📥 导出
+                </button>
+                <button class="btn btn-primary btn-small" onclick="continueSession()" id="continueBtn" disabled>
+                    继续对话
+                </button>
+                <button class="btn btn-danger btn-small" onclick="deleteSession()" id="deleteBtn" disabled>
+                    🗑️ 删除
+                </button>
+            </div>
+        </div>
+        <div class="detail-content" id="detailContent">
+            <div class="empty-state">
+                <div class="empty-icon">📚</div>
+                <div>选择左侧会话查看详细内容</div>
+            </div>
+        </div>
+    </div>
+
+    <script src="assets/common.js"></script>
+    <script>
+        // 测试数据：会话列表
+        const sessions = [
+            {
+                id: 1,
+                title: 'Python 性能优化讨论',
+                assistant: 'Python 编程助手',
+                preview: '我想了解如何优化 Python 代码的性能，特别是处理大数据集的时候...',
+                messageCount: 15,
+                model: 'Qwen 2.5 Coder',
+                createdAt: new Date('2025-11-12 14:30:00'),
+                updatedAt: new Date('2025-11-12 16:45:00'),
+                tags: ['Python', '性能优化', '数据处理'],
+                messages: [
+                    { role: 'user', content: '我想了解如何优化 Python 代码的性能，特别是处理大数据集的时候...', timestamp: '14:30' },
+                    { role: 'assistant', content: '针对大数据集的 Python 性能优化，有几个关键方向：\n\n1. 使用 NumPy/Pandas 而不是纯 Python 循环\n2. 利用向量化操作\n3. 考虑使用 Dask 进行并行计算\n4. 使用生成器减少内存占用', timestamp: '14:31' },
+                    { role: 'user', content: '能给我一个具体的例子吗？比如处理百万级数据的求和操作？', timestamp: '14:35' }
+                ]
+            },
+            {
+                id: 2,
+                title: '技术博客写作指导',
+                assistant: '技术写作助手',
+                preview: '我想写一篇关于微服务架构的技术博客，应该如何组织内容结构？',
+                messageCount: 8,
+                model: 'Qwen-Plus',
+                createdAt: new Date('2025-11-12 10:15:00'),
+                updatedAt: new Date('2025-11-12 11:20:00'),
+                tags: ['写作', '技术博客', '微服务'],
+                messages: [
+                    { role: 'user', content: '我想写一篇关于微服务架构的技术博客...', timestamp: '10:15' },
+                    { role: 'assistant', content: '写技术博客的结构建议...', timestamp: '10:16' }
+                ]
+            },
+            {
+                id: 3,
+                title: 'Kubernetes 部署问题排查',
+                assistant: 'DevOps 运维助手',
+                preview: 'Pod 一直处于 CrashLoopBackOff 状态，日志显示连接数据库失败...',
+                messageCount: 12,
+                model: 'Qwen-Plus',
+                createdAt: new Date('2025-11-11 16:00:00'),
+                updatedAt: new Date('2025-11-11 18:30:00'),
+                tags: ['Kubernetes', '故障排查', 'DevOps'],
+                messages: []
+            },
+            {
+                id: 4,
+                title: '英文技术文档翻译',
+                assistant: '中英翻译专家',
+                preview: '需要将这份 API 文档从英文翻译成中文，保持专业术语的准确性...',
+                messageCount: 20,
+                model: 'Qwen-Max',
+                createdAt: new Date('2025-11-11 14:00:00'),
+                updatedAt: new Date('2025-11-11 15:30:00'),
+                tags: ['翻译', 'API文档'],
+                messages: []
+            },
+            {
+                id: 5,
+                title: 'SQL 查询性能优化',
+                assistant: 'SQL 数据分析师',
+                preview: '一个复杂的 JOIN 查询运行很慢，有什么优化建议吗？',
+                messageCount: 10,
+                model: 'Qwen-Plus',
+                createdAt: new Date('2025-11-10 09:00:00'),
+                updatedAt: new Date('2025-11-10 10:15:00'),
+                tags: ['SQL', '性能优化', '数据库'],
+                messages: []
+            },
+            {
+                id: 6,
+                title: 'React 组件设计讨论',
+                assistant: '前端开发助手',
+                preview: '如何设计一个可复用的表单组件，支持各种验证规则？',
+                messageCount: 18,
+                model: 'Qwen 2.5 Coder',
+                createdAt: new Date('2025-11-10 15:30:00'),
+                updatedAt: new Date('2025-11-10 17:00:00'),
+                tags: ['React', '组件设计', '前端'],
+                messages: []
+            }
+        ];
+
+        let currentSession = null;
+        let filteredSessions = [...sessions];
+
+        // 初始化
+        window.onload = function() {
+            renderSessionsList();
+        };
+
+        // 渲染会话列表
+        function renderSessionsList() {
+            const container = document.getElementById('sessionsList');
+            container.innerHTML = '';
+
+            // 按日期分组
+            const today = [];
+            const yesterday = [];
+            const thisWeek = [];
+            const older = [];
+
+            const now = new Date();
+            const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+            const yesterdayStart = new Date(todayStart - 86400000);
+            const weekStart = new Date(todayStart - 7 * 86400000);
+
+            filteredSessions.forEach(session => {
+                if (session.updatedAt >= todayStart) {
+                    today.push(session);
+                } else if (session.updatedAt >= yesterdayStart) {
+                    yesterday.push(session);
+                } else if (session.updatedAt >= weekStart) {
+                    thisWeek.push(session);
+                } else {
+                    older.push(session);
+                }
+            });
+
+            // 渲染各组
+            if (today.length > 0) {
+                renderSessionGroup('今天', today);
+            }
+            if (yesterday.length > 0) {
+                renderSessionGroup('昨天', yesterday);
+            }
+            if (thisWeek.length > 0) {
+                renderSessionGroup('本周', thisWeek);
+            }
+            if (older.length > 0) {
+                renderSessionGroup('更早', older);
+            }
+        }
+
+        // 渲染会话组
+        function renderSessionGroup(title, sessions) {
+            const container = document.getElementById('sessionsList');
+            
+            const group = document.createElement('div');
+            group.className = 'session-group';
+            group.innerHTML = `<div class="session-group-title">${title}</div>`;
+
+            sessions.forEach(session => {
+                const item = document.createElement('div');
+                item.className = 'session-item';
+                if (currentSession && currentSession.id === session.id) {
+                    item.classList.add('active');
+                }
+                
+                item.innerHTML = `
+                    <div class="session-item-header">
+                        <div class="session-title">${session.title}</div>
+                    </div>
+                    <div class="session-preview">${session.preview}</div>
+                    <div class="session-meta">
+                        <span>💬 ${session.messageCount} 条消息</span>
+                        <span>🤖 ${session.assistant}</span>
+                    </div>
+                `;
+                
+                item.onclick = () => showSessionDetail(session);
+                group.appendChild(item);
+            });
+
+            container.appendChild(group);
+        }
+
+        // 显示会话详情
+        function showSessionDetail(session) {
+            currentSession = session;
+            
+            // 更新标题
+            document.getElementById('detailTitle').textContent = session.title;
+            
+            // 启用按钮
+            document.getElementById('exportBtn').disabled = false;
+            document.getElementById('continueBtn').disabled = false;
+            document.getElementById('deleteBtn').disabled = false;
+
+            // 渲染详情内容
+            const content = document.getElementById('detailContent');
+            content.innerHTML = `
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-value">${session.messageCount}</div>
+                        <div class="stat-label">消息数</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value">${session.tags.length}</div>
+                        <div class="stat-label">标签数</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value">${Math.floor((session.updatedAt - session.createdAt) / 60000)}</div>
+                        <div class="stat-label">持续时长(分钟)</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value">${session.model.split(' ')[0]}</div>
+                        <div class="stat-label">使用模型</div>
+                    </div>
+                </div>
+
+                <div class="session-info-card">
+                    <div class="info-grid">
+                        <div class="info-item">
+                            <div class="info-label">助手</div>
+                            <div class="info-value">🤖 ${session.assistant}</div>
+                        </div>
+                        <div class="info-item">
+                            <div class="info-label">模型</div>
+                            <div class="info-value">${session.model}</div>
+                        </div>
+                        <div class="info-item">
+                            <div class="info-label">创建时间</div>
+                            <div class="info-value">${Utils.formatTime(session.createdAt)}</div>
+                        </div>
+                        <div class="info-item">
+                            <div class="info-label">最后更新</div>
+                            <div class="info-value">${Utils.formatTime(session.updatedAt)}</div>
+                        </div>
+                    </div>
+                    <div style="margin-top: 16px;">
+                        <div class="info-label" style="margin-bottom: 8px;">标签</div>
+                        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                            ${session.tags.map(tag => `<span class="tag tag-low">${tag}</span>`).join('')}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="messages-preview">
+                    <div class="preview-title">
+                        <span>消息预览</span>
+                        <span class="tag tag-low">${session.messages.length} / ${session.messageCount} 条</span>
+                    </div>
+                    ${session.messages.length > 0 ? session.messages.map(msg => `
+                        <div class="message-preview-item">
+                            <div class="message-preview-header">
+                                <span>${msg.role === 'user' ? '👤 用户' : '🤖 助手'}</span>
+                                <span>${msg.timestamp}</span>
+                            </div>
+                            <div class="message-preview-content">${msg.content}</div>
+                        </div>
+                    `).join('') : '<div style="text-align: center; color: var(--text-secondary); padding: 20px;">消息内容已归档</div>'}
+                </div>
+            `;
+
+            // 更新列表中的选中状态
+            document.querySelectorAll('.session-item').forEach(item => {
+                item.classList.remove('active');
+            });
+            event.currentTarget.classList.add('active');
+        }
+
+        // 搜索会话
+        function searchSessions(query) {
+            query = query.toLowerCase();
+            if (!query) {
+                filteredSessions = [...sessions];
+            } else {
+                filteredSessions = sessions.filter(s => 
+                    s.title.toLowerCase().includes(query) ||
+                    s.preview.toLowerCase().includes(query) ||
+                    s.tags.some(tag => tag.toLowerCase().includes(query))
+                );
+            }
+            renderSessionsList();
+        }
+
+        // 过滤会话
+        function filterSessions(filter) {
+            const now = new Date();
+            const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+            const weekStart = new Date(todayStart - 7 * 86400000);
+
+            switch(filter) {
+                case 'today':
+                    filteredSessions = sessions.filter(s => s.updatedAt >= todayStart);
+                    break;
+                case 'week':
+                    filteredSessions = sessions.filter(s => s.updatedAt >= weekStart);
+                    break;
+                default:
+                    filteredSessions = [...sessions];
+            }
+
+            // 更新标签样式
+            document.querySelectorAll('.filter-tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            event.target.classList.add('active');
+
+            renderSessionsList();
+        }
+
+        // 继续会话
+        function continueSession() {
+            if (currentSession) {
+                Storage.set('currentSession', currentSession);
+                window.location.href = 'index.html';
+            }
+        }
+
+        // 导出会话
+        function exportSession() {
+            if (currentSession) {
+                Utils.showToast('正在导出会话...', 'info');
+                setTimeout(() => {
+                    Utils.showToast('会话已导出为 Markdown', 'success');
+                }, 1000);
+            }
+        }
+
+        // 删除会话
+        function deleteSession() {
+            if (currentSession) {
+                Utils.confirm(`确定要删除会话"${currentSession.title}"吗？`, () => {
+                    const index = sessions.findIndex(s => s.id === currentSession.id);
+                    sessions.splice(index, 1);
+                    filteredSessions = [...sessions];
+                    
+                    currentSession = null;
+                    document.getElementById('detailContent').innerHTML = `
+                        <div class="empty-state">
+                            <div class="empty-icon">📚</div>
+                            <div>选择左侧会话查看详细内容</div>
+                        </div>
+                    `;
+                    document.getElementById('detailTitle').textContent = '选择一个会话查看详情';
+                    
+                    renderSessionsList();
+                    Utils.showToast('会话已删除', 'success');
+                });
+            }
+        }
+    </script>
+</body>
+</html>
+

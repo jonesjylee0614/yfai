@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>命令面板</title>
+    <link rel="stylesheet" href="assets/common.css">
+    <style>
+        body {
+            padding: 0;
+            overflow: hidden;
+        }
+
+        .palette-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(4px);
+            display: flex;
+            align-items: flex-start;
+            justify-content: center;
+            padding-top: 15vh;
+            animation: fadeIn 0.2s;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .palette-container {
+            width: 90%;
+            max-width: 700px;
+            background: var(--bg-dark);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            box-shadow: 0 12px 48px rgba(0, 0, 0, 0.5);
+            overflow: hidden;
+            animation: slideDown 0.3s;
+        }
+
+        @keyframes slideDown {
+            from {
+                transform: translateY(-20px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        .palette-search {
+            padding: 20px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .search-input-wrapper {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+
+        .search-icon {
+            position: absolute;
+            left: 16px;
+            font-size: 20px;
+            color: var(--text-secondary);
+        }
+
+        .palette-input {
+            width: 100%;
+            padding: 14px 16px 14px 48px;
+            background: var(--bg-light);
+            border: 2px solid var(--border-color);
+            border-radius: var(--radius);
+            color: var(--text-primary);
+            font-size: 16px;
+            outline: none;
+            transition: all 0.3s;
+        }
+
+        .palette-input:focus {
+            border-color: var(--primary-color);
+            background: var(--bg-darker);
+        }
+
+        .palette-tabs {
+            display: flex;
+            padding: 12px 20px;
+            gap: 8px;
+            background: var(--bg-darker);
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .palette-tab {
+            padding: 6px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            color: var(--text-secondary);
+            transition: all 0.3s;
+            border: 1px solid transparent;
+        }
+
+        .palette-tab:hover {
+            color: var(--text-primary);
+            background: var(--bg-light);
+        }
+
+        .palette-tab.active {
+            color: var(--primary-color);
+            background: rgba(24, 144, 255, 0.1);
+            border-color: var(--primary-color);
+        }
+
+        .palette-results {
+            max-height: 400px;
+            overflow-y: auto;
+            padding: 8px;
+        }
+
+        .command-item {
+            display: flex;
+            align-items: center;
+            padding: 12px 16px;
+            border-radius: var(--radius);
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-bottom: 4px;
+            border: 1px solid transparent;
+        }
+
+        .command-item:hover,
+        .command-item.selected {
+            background: var(--bg-light);
+            border-color: var(--primary-color);
+        }
+
+        .command-icon {
+            font-size: 24px;
+            margin-right: 12px;
+            flex-shrink: 0;
+        }
+
+        .command-content {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .command-title {
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 2px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .command-desc {
+            font-size: 12px;
+            color: var(--text-secondary);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .command-shortcut {
+            font-size: 11px;
+            color: var(--text-secondary);
+            background: var(--bg-darker);
+            padding: 3px 8px;
+            border-radius: 4px;
+            border: 1px solid var(--border-color);
+            flex-shrink: 0;
+        }
+
+        .command-category {
+            font-size: 11px;
+            padding: 2px 8px;
+            border-radius: 4px;
+            background: rgba(24, 144, 255, 0.2);
+            color: var(--primary-color);
+        }
+
+        .palette-footer {
+            padding: 12px 20px;
+            background: var(--bg-darker);
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .footer-hints {
+            display: flex;
+            gap: 16px;
+        }
+
+        .footer-hint {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .hint-key {
+            background: var(--bg-light);
+            padding: 2px 6px;
+            border-radius: 3px;
+            border: 1px solid var(--border-color);
+            font-family: monospace;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--text-secondary);
+        }
+
+        .empty-icon {
+            font-size: 48px;
+            margin-bottom: 12px;
+        }
+
+        .recent-commands {
+            padding: 8px;
+        }
+
+        .recent-title {
+            font-size: 12px;
+            color: var(--text-secondary);
+            padding: 8px 16px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="palette-overlay" onclick="handleOverlayClick(event)">
+        <div class="palette-container" onclick="event.stopPropagation()">
+            <!-- 搜索框 -->
+            <div class="palette-search">
+                <div class="search-input-wrapper">
+                    <span class="search-icon">🔍</span>
+                    <input 
+                        type="text" 
+                        class="palette-input" 
+                        id="commandInput"
+                        placeholder="输入命令或搜索... (支持 / 前缀命令)"
+                        autofocus
+                        oninput="handleSearch(this.value)"
+                        onkeydown="handleKeydown(event)"
+                    >
+                </div>
+            </div>
+
+            <!-- 标签页 -->
+            <div class="palette-tabs">
+                <div class="palette-tab active" onclick="switchCategory('all')">
+                    全部
+                </div>
+                <div class="palette-tab" onclick="switchCategory('file')">
+                    📁 文件
+                </div>
+                <div class="palette-tab" onclick="switchCategory('shell')">
+                    ⚡ 脚本
+                </div>
+                <div class="palette-tab" onclick="switchCategory('mcp')">
+                    🔧 MCP
+                </div>
+                <div class="palette-tab" onclick="switchCategory('system')">
+                    ⚙️ 系统
+                </div>
+            </div>
+
+            <!-- 命令列表 -->
+            <div class="palette-results" id="commandResults">
+                <div class="recent-commands" id="recentCommands">
+                    <div class="recent-title">最近使用</div>
+                    <!-- 最近命令会动态插入 -->
+                </div>
+                <div id="allCommands">
+                    <!-- 所有命令会动态插入 -->
+                </div>
+            </div>
+
+            <!-- 底部提示 -->
+            <div class="palette-footer">
+                <div class="footer-hints">
+                    <div class="footer-hint">
+                        <span class="hint-key">↑↓</span>
+                        <span>导航</span>
+                    </div>
+                    <div class="footer-hint">
+                        <span class="hint-key">Enter</span>
+                        <span>执行</span>
+                    </div>
+                    <div class="footer-hint">
+                        <span class="hint-key">Esc</span>
+                        <span>关闭</span>
+                    </div>
+                </div>
+                <div id="resultCount">0 条结果</div>
+            </div>
+        </div>
+    </div>
+
+    <script src="assets/common.js"></script>
+    <script>
+        // 命令数据
+        const commands = [
+            // 文件操作
+            { id: 'file-read', icon: '📖', title: '读取文件', desc: '读取指定文件内容', category: 'file', command: '/file read' },
+            { id: 'file-search', icon: '🔍', title: '搜索文件', desc: '在目录中搜索文件', category: 'file', command: '/file search' },
+            { id: 'file-list', icon: '📋', title: '列出文件', desc: '列出目录中的所有文件', category: 'file', command: '/file list' },
+            { id: 'file-index', icon: '🗂️', title: '索引目录', desc: '为目录建立知识库索引', category: 'file', command: '/index' },
+            
+            // Shell 脚本
+            { id: 'shell-ps', icon: '⚡', title: 'PowerShell', desc: '执行 PowerShell 命令', category: 'shell', command: '/ps', shortcut: 'Ctrl+Shift+P' },
+            { id: 'shell-bash', icon: '🐧', title: 'Bash (WSL)', desc: '执行 Bash 命令', category: 'shell', command: '/bash' },
+            { id: 'shell-python', icon: '🐍', title: 'Python 脚本', desc: '运行 Python 脚本', category: 'shell', command: '/python' },
+            { id: 'shell-template', icon: '📝', title: '脚本模板', desc: '使用预定义脚本模板', category: 'shell', command: '/template' },
+            
+            // MCP 工具
+            { id: 'mcp-list', icon: '📡', title: '列出 MCP 工具', desc: '显示所有可用的 MCP 工具', category: 'mcp', command: '/mcp list' },
+            { id: 'mcp-call', icon: '🔧', title: '调用 MCP 工具', desc: '直接调用 MCP 工具', category: 'mcp', command: '/tool' },
+            { id: 'mcp-start', icon: '▶️', title: '启动 MCP 服务', desc: '启动指定的 MCP 服务器', category: 'mcp', command: '/mcp start' },
+            { id: 'mcp-stop', icon: '⏹️', title: '停止 MCP 服务', desc: '停止指定的 MCP 服务器', category: 'mcp', command: '/mcp stop' },
+            
+            // 系统操作
+            { id: 'sys-new-chat', icon: '💬', title: '新建对话', desc: '开始新的对话会话', category: 'system', command: '/new', shortcut: 'Ctrl+N' },
+            { id: 'sys-settings', icon: '⚙️', title: '打开设置', desc: '打开系统设置页面', category: 'system', command: '/settings' },
+            { id: 'sys-logs', icon: '📋', title: '查看日志', desc: '查看系统操作日志', category: 'system', command: '/logs' },
+            { id: 'sys-export', icon: '💾', title: '导出对话', desc: '导出当前对话记录', category: 'system', command: '/export' },
+            { id: 'sys-clear', icon: '🗑️', title: '清空对话', desc: '清空当前对话内容', category: 'system', command: '/clear' },
+            { id: 'sys-help', icon: '❓', title: '帮助文档', desc: '查看使用帮助和文档', category: 'system', command: '/help', shortcut: 'F1' },
+            
+            // 进程管理
+            { id: 'proc-list', icon: '📊', title: '进程列表', desc: '查看系统进程列表', category: 'system', command: '/ps list' },
+            { id: 'proc-kill', icon: '🔴', title: '结束进程', desc: '结束指定进程', category: 'system', command: '/ps kill' },
+            
+            // 网络工具
+            { id: 'net-http', icon: '🌐', title: 'HTTP 请求', desc: '发送 HTTP/HTTPS 请求', category: 'system', command: '/http' },
+            { id: 'net-ping', icon: '📡', title: 'Ping 测试', desc: '测试网络连通性', category: 'system', command: '/ping' },
+            
+            // 模型切换
+            { id: 'model-bailian', icon: '🤖', title: '切换到百炼', desc: '使用阿里百炼模型', category: 'system', command: '/model bailian' },
+            { id: 'model-ollama', icon: '🦙', title: '切换到 Ollama', desc: '使用本地 Ollama 模型', category: 'system', command: '/model ollama' }
+        ];
+
+        let currentCategory = 'all';
+        let filteredCommands = [...commands];
+        let selectedIndex = 0;
+        let recentCommands = Storage.get('recentCommands', []);
+
+        // 初始化
+        window.onload = function() {
+            renderCommands();
+            renderRecentCommands();
+        };
+
+        // 渲染命令列表
+        function renderCommands() {
+            const container = document.getElementById('allCommands');
+            container.innerHTML = '';
+            
+            if (filteredCommands.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-icon">🔍</div>
+                        <div>未找到匹配的命令</div>
+                    </div>
+                `;
+                document.getElementById('resultCount').textContent = '0 条结果';
+                return;
+            }
+
+            filteredCommands.forEach((cmd, index) => {
+                const item = document.createElement('div');
+                item.className = `command-item ${index === selectedIndex ? 'selected' : ''}`;
+                item.onclick = () => executeCommand(cmd);
+                
+                item.innerHTML = `
+                    <div class="command-icon">${cmd.icon}</div>
+                    <div class="command-content">
+                        <div class="command-title">
+                            ${cmd.title}
+                            <span class="command-category">${getCategoryName(cmd.category)}</span>
+                        </div>
+                        <div class="command-desc">${cmd.desc} · ${cmd.command}</div>
+                    </div>
+                    ${cmd.shortcut ? `<div class="command-shortcut">${cmd.shortcut}</div>` : ''}
+                `;
+                
+                container.appendChild(item);
+            });
+
+            document.getElementById('resultCount').textContent = `${filteredCommands.length} 条结果`;
+        }
+
+        // 渲染最近命令
+        function renderRecentCommands() {
+            const container = document.getElementById('recentCommands');
+            
+            if (recentCommands.length === 0) {
+                container.style.display = 'none';
+                return;
+            }
+
+            const recentItems = recentCommands
+                .map(id => commands.find(c => c.id === id))
+                .filter(c => c)
+                .slice(0, 5);
+
+            let html = '<div class="recent-title">最近使用</div>';
+            
+            recentItems.forEach(cmd => {
+                html += `
+                    <div class="command-item" onclick="executeCommand(${JSON.stringify(cmd).replace(/"/g, '&quot;')})">
+                        <div class="command-icon">${cmd.icon}</div>
+                        <div class="command-content">
+                            <div class="command-title">${cmd.title}</div>
+                            <div class="command-desc">${cmd.command}</div>
+                        </div>
+                    </div>
+                `;
+            });
+
+            container.innerHTML = html;
+        }
+
+        // 搜索命令
+        function handleSearch(query) {
+            query = query.toLowerCase().trim();
+            
+            if (!query) {
+                filteredCommands = currentCategory === 'all' 
+                    ? [...commands] 
+                    : commands.filter(c => c.category === currentCategory);
+            } else {
+                filteredCommands = commands.filter(cmd => {
+                    const matchCategory = currentCategory === 'all' || cmd.category === currentCategory;
+                    const matchQuery = 
+                        cmd.title.toLowerCase().includes(query) ||
+                        cmd.desc.toLowerCase().includes(query) ||
+                        cmd.command.toLowerCase().includes(query);
+                    return matchCategory && matchQuery;
+                });
+            }
+            
+            selectedIndex = 0;
+            renderCommands();
+        }
+
+        // 切换分类
+        function switchCategory(category) {
+            currentCategory = category;
+            
+            // 更新标签样式
+            document.querySelectorAll('.palette-tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            event.target.classList.add('active');
+            
+            // 重新搜索
+            const query = document.getElementById('commandInput').value;
+            handleSearch(query);
+        }
+
+        // 键盘导航
+        function handleKeydown(event) {
+            switch(event.key) {
+                case 'ArrowDown':
+                    event.preventDefault();
+                    selectedIndex = Math.min(selectedIndex + 1, filteredCommands.length - 1);
+                    renderCommands();
+                    scrollToSelected();
+                    break;
+                    
+                case 'ArrowUp':
+                    event.preventDefault();
+                    selectedIndex = Math.max(selectedIndex - 1, 0);
+                    renderCommands();
+                    scrollToSelected();
+                    break;
+                    
+                case 'Enter':
+                    event.preventDefault();
+                    if (filteredCommands[selectedIndex]) {
+                        executeCommand(filteredCommands[selectedIndex]);
+                    }
+                    break;
+                    
+                case 'Escape':
+                    window.close();
+                    break;
+            }
+        }
+
+        // 滚动到选中项
+        function scrollToSelected() {
+            const selected = document.querySelector('.command-item.selected');
+            if (selected) {
+                selected.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+            }
+        }
+
+        // 执行命令
+        function executeCommand(cmd) {
+            // 保存到最近使用
+            recentCommands = [cmd.id, ...recentCommands.filter(id => id !== cmd.id)].slice(0, 10);
+            Storage.set('recentCommands', recentCommands);
+            
+            // 发送命令到主窗口
+            if (window.opener) {
+                window.opener.postMessage({
+                    type: 'executeCommand',
+                    command: cmd
+                }, '*');
+            }
+            
+            Utils.showToast(`执行命令: ${cmd.title}`, 'success');
+            
+            // 关闭窗口
+            setTimeout(() => window.close(), 300);
+        }
+
+        // 获取分类名称
+        function getCategoryName(category) {
+            const names = {
+                file: '文件',
+                shell: '脚本',
+                mcp: 'MCP',
+                system: '系统'
+            };
+            return names[category] || category;
+        }
+
+        // 点击遮罩关闭
+        function handleOverlayClick(event) {
+            if (event.target.classList.contains('palette-overlay')) {
+                window.close();
+            }
+        }
+
+        // ESC 关闭
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                window.close();
+            }
+        });
+    </script>
+</body>
+</html>
+

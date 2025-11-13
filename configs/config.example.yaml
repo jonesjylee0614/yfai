@@ -1,0 +1,133 @@
+app:
+  # 默认Provider: bailian / ollama / auto
+  default_provider: bailian
+  
+  # 模型路由策略
+  model_route:
+    coding: ollama:qwen2.5-coder
+    general: bailian:qwen-plus
+    offline_only: ollama:llama3.1
+  
+  # 工具决策模式: rule_first_then_llm / llm_only / rule_only
+  tool_decision: rule_first_then_llm
+  
+  # 超时设置（秒）
+  timeout_sec: 60
+  
+  # 流式输出
+  stream_output: true
+  
+  # 自动保存会话
+  auto_save: true
+
+providers:
+  bailian:
+    api_base: https://dashscope.aliyuncs.com/compatible-mode/v1
+    api_key_env: DASHSCOPE_API_KEY
+    default_model: qwen-plus
+    timeout: 60
+    max_retries: 3
+  
+  ollama:
+    api_base: http://127.0.0.1:11434
+    timeout: 120
+    default_model: qwen2.5-coder
+
+mcp:
+  # MCP服务器注册中心
+  registry:
+    - name: files
+      endpoint: ws://127.0.0.1:9001
+      auth: none
+      allow_tools: ["fs.read", "fs.write", "fs.search"]
+      enabled: false
+    
+    - name: devops
+      endpoint: wss://mcp.example.com
+      auth: bearer:${MCP_TOKEN}
+      allow_tools: ["k8s.describe", "jenkins.trigger", "git.ops"]
+      enabled: false
+    
+    - name: database
+      endpoint: ws://127.0.0.1:9002
+      auth: none
+      allow_tools: ["db.query", "db.schema"]
+      enabled: false
+
+local_ops:
+  # 文件访问白名单
+  roots_whitelist:
+    - "D:/WorkSpace"
+    - "C:/Users/${USERNAME}/Desktop"
+    - "C:/Users/${USERNAME}/Documents"
+  
+  # 需要审批的危险操作
+  dangerous_ops:
+    require_approval: 
+      - delete
+      - process.kill
+      - script.exec
+      - net.port_open
+      - file.write
+      - file.move
+  
+  # Shell配置
+  shell:
+    default: powershell  # powershell / bash / cmd
+    wsl: false
+    timeout: 300
+
+security:
+  # 确认阈值: low / medium / high / critical
+  confirm_threshold: medium
+  
+  # 自动审计
+  auto_audit: true
+  
+  # 敏感信息脱敏
+  redact:
+    paths:
+      - "C:/Users/*/\.ssh"
+      - "C:/Secrets"
+      - "*/.env"
+    envs:
+      - "AWS_*"
+      - "OPENAI_*"
+      - "DASHSCOPE_*"
+      - "*_KEY"
+      - "*_SECRET"
+  
+  # 日志保留策略（天）
+  log_retention_days: 30
+
+rag:
+  # 向量模型
+  embedding_model: dashscope:text-embedding-v1  # dashscope / bge-large-zh / m3e-base
+  
+  # 分块策略
+  chunk_size: 500
+  chunk_overlap: 50
+  
+  # 检索参数
+  top_k: 5
+  similarity_threshold: 0.7
+
+database:
+  # SQLite数据库路径
+  path: data/yfai.db
+  
+  # 向量索引路径
+  vector_index_path: data/vectors
+
+ui:
+  # 主题: dark / light
+  theme: dark
+  
+  # 字体
+  font_family: "Microsoft YaHei UI, Segoe UI"
+  font_size: 14
+  
+  # 窗口大小
+  window_width: 1400
+  window_height: 900
+

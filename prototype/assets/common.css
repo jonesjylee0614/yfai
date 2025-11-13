@@ -1,0 +1,360 @@
+/* AI 控制台 - 公共样式 */
+
+:root {
+    --primary-color: #1890ff;
+    --success-color: #52c41a;
+    --warning-color: #faad14;
+    --danger-color: #ff4d4f;
+    --bg-dark: #1e1e1e;
+    --bg-darker: #141414;
+    --bg-light: #252525;
+    --text-primary: #e8e8e8;
+    --text-secondary: #a8a8a8;
+    --border-color: #3a3a3a;
+    --shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    --radius: 8px;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Segoe UI', 'Microsoft YaHei', Arial, sans-serif;
+    background: var(--bg-darker);
+    color: var(--text-primary);
+    line-height: 1.6;
+    font-size: 14px;
+    overflow: hidden;
+}
+
+/* 滚动条样式 */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--bg-darker);
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--border-color);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #4a4a4a;
+}
+
+/* 按钮通用样式 */
+.btn {
+    padding: 8px 16px;
+    border: none;
+    border-radius: var(--radius);
+    cursor: pointer;
+    font-size: 14px;
+    transition: all 0.3s;
+    font-family: inherit;
+    outline: none;
+}
+
+.btn-primary {
+    background: var(--primary-color);
+    color: white;
+}
+
+.btn-primary:hover {
+    background: #40a9ff;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(24, 144, 255, 0.3);
+}
+
+.btn-success {
+    background: var(--success-color);
+    color: white;
+}
+
+.btn-success:hover {
+    background: #73d13d;
+}
+
+.btn-warning {
+    background: var(--warning-color);
+    color: white;
+}
+
+.btn-warning:hover {
+    background: #ffc53d;
+}
+
+.btn-danger {
+    background: var(--danger-color);
+    color: white;
+}
+
+.btn-danger:hover {
+    background: #ff7875;
+}
+
+.btn-secondary {
+    background: var(--bg-light);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+}
+
+.btn-secondary:hover {
+    background: #2a2a2a;
+}
+
+.btn-small {
+    padding: 4px 12px;
+    font-size: 12px;
+}
+
+/* 输入框通用样式 */
+input[type="text"],
+input[type="password"],
+input[type="number"],
+textarea,
+select {
+    background: var(--bg-light);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    padding: 8px 12px;
+    font-size: 14px;
+    font-family: inherit;
+    width: 100%;
+    transition: all 0.3s;
+}
+
+input:focus,
+textarea:focus,
+select:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2);
+}
+
+/* 标签样式 */
+.tag {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    margin-right: 4px;
+}
+
+.tag-low {
+    background: rgba(82, 196, 26, 0.2);
+    color: var(--success-color);
+}
+
+.tag-medium {
+    background: rgba(250, 173, 20, 0.2);
+    color: var(--warning-color);
+}
+
+.tag-high {
+    background: rgba(255, 77, 79, 0.2);
+    color: var(--danger-color);
+}
+
+.tag-critical {
+    background: var(--danger-color);
+    color: white;
+}
+
+/* 卡片样式 */
+.card {
+    background: var(--bg-dark);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    padding: 16px;
+    margin-bottom: 12px;
+}
+
+.card-title {
+    font-size: 16px;
+    font-weight: 600;
+    margin-bottom: 12px;
+}
+
+/* 消息样式 */
+.message {
+    margin-bottom: 16px;
+    animation: fadeIn 0.3s;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.message-user {
+    text-align: right;
+}
+
+.message-content {
+    display: inline-block;
+    max-width: 80%;
+    padding: 12px 16px;
+    border-radius: var(--radius);
+    word-wrap: break-word;
+}
+
+.message-user .message-content {
+    background: var(--primary-color);
+    color: white;
+}
+
+.message-assistant .message-content {
+    background: var(--bg-light);
+    color: var(--text-primary);
+    text-align: left;
+}
+
+.message-system .message-content {
+    background: rgba(250, 173, 20, 0.2);
+    color: var(--warning-color);
+    font-size: 13px;
+}
+
+/* 代码块样式 */
+pre {
+    background: var(--bg-darker);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    padding: 12px;
+    overflow-x: auto;
+    margin: 8px 0;
+}
+
+code {
+    font-family: 'Consolas', 'Monaco', monospace;
+    font-size: 13px;
+    color: #a8daff;
+}
+
+/* 加载动画 */
+.loading {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    border: 2px solid var(--border-color);
+    border-top-color: var(--primary-color);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* 工具提示 */
+.tooltip {
+    position: relative;
+    display: inline-block;
+}
+
+.tooltip::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--bg-darker);
+    color: var(--text-primary);
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s;
+    margin-bottom: 4px;
+    box-shadow: var(--shadow);
+}
+
+.tooltip:hover::after {
+    opacity: 1;
+}
+
+/* 分隔线 */
+.divider {
+    height: 1px;
+    background: var(--border-color);
+    margin: 16px 0;
+}
+
+/* 徽章 */
+.badge {
+    display: inline-block;
+    min-width: 20px;
+    height: 20px;
+    padding: 0 6px;
+    font-size: 12px;
+    line-height: 20px;
+    text-align: center;
+    border-radius: 10px;
+    background: var(--danger-color);
+    color: white;
+}
+
+/* 图标样式 */
+.icon {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    margin-right: 4px;
+    vertical-align: middle;
+}
+
+/* 响应式 */
+@media (max-width: 768px) {
+    body {
+        font-size: 13px;
+    }
+    
+    .btn {
+        padding: 6px 12px;
+        font-size: 13px;
+    }
+}
+
+/* 状态指示器 */
+.status-indicator {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    margin-right: 6px;
+}
+
+.status-success {
+    background: var(--success-color);
+}
+
+.status-warning {
+    background: var(--warning-color);
+}
+
+.status-error {
+    background: var(--danger-color);
+}
+
+.status-offline {
+    background: var(--text-secondary);
+}
+

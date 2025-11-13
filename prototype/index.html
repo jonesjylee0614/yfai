@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 控制台 - 主界面</title>
+    <link rel="stylesheet" href="assets/common.css">
+    <style>
+        .container {
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* 侧边栏 */
+        .sidebar {
+            width: 200px;
+            background: var(--bg-darker);
+            border-right: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            padding: 12px 0;
+        }
+
+        .sidebar-item {
+            width: 100%;
+            padding: 12px 16px;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            color: var(--text-secondary);
+            text-decoration: none;
+            white-space: nowrap;
+        }
+
+        .sidebar-item:hover {
+            background: var(--bg-light);
+            color: var(--text-primary);
+        }
+
+        .sidebar-item.active {
+            background: var(--bg-light);
+            color: var(--primary-color);
+            border-left: 3px solid var(--primary-color);
+        }
+
+        .sidebar-icon {
+            width: 24px;
+            height: 24px;
+            font-size: 20px;
+            flex-shrink: 0;
+        }
+
+        .sidebar-text {
+            font-size: 14px;
+        }
+
+        /* 主内容区 */
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* 顶部栏 */
+        .header {
+            height: 60px;
+            background: var(--bg-dark);
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 20px;
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .logo {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--primary-color);
+        }
+
+        .provider-selector {
+            padding: 6px 12px;
+            background: var(--bg-light);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+            color: var(--text-primary);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .status-bar {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+
+        /* 对话区 */
+        .chat-container {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+        }
+
+        .chat-main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .messages-area {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+        }
+
+        .welcome-screen {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            color: var(--text-secondary);
+        }
+
+        .welcome-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+        }
+
+        .welcome-title {
+            font-size: 24px;
+            margin-bottom: 8px;
+            color: var(--text-primary);
+        }
+
+        .quick-actions {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 12px;
+            margin-top: 32px;
+            max-width: 800px;
+        }
+
+        .quick-action {
+            padding: 16px;
+            background: var(--bg-light);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .quick-action:hover {
+            border-color: var(--primary-color);
+            transform: translateY(-2px);
+            box-shadow: var(--shadow);
+        }
+
+        .quick-action-title {
+            font-weight: 600;
+            margin-bottom: 4px;
+            color: var(--text-primary);
+        }
+
+        .quick-action-desc {
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        /* 输入区 */
+        .input-area {
+            background: var(--bg-dark);
+            border-top: 1px solid var(--border-color);
+            padding: 16px 20px;
+        }
+
+        .input-wrapper {
+            display: flex;
+            gap: 12px;
+            align-items: flex-end;
+        }
+
+        .input-box {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .input-tools {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+
+        .input-tool-btn {
+            padding: 4px 8px;
+            background: var(--bg-light);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            color: var(--text-secondary);
+            transition: all 0.3s;
+        }
+
+        .input-tool-btn:hover {
+            color: var(--text-primary);
+            border-color: var(--primary-color);
+        }
+
+        #messageInput {
+            min-height: 60px;
+            max-height: 200px;
+            resize: none;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        .send-btn {
+            padding: 12px 24px;
+            min-width: 80px;
+        }
+
+        /* 工具面板（右侧） */
+        .tools-panel {
+            width: 0;
+            background: var(--bg-dark);
+            border-left: 1px solid var(--border-color);
+            overflow: hidden;
+            transition: width 0.3s;
+        }
+
+        .tools-panel.open {
+            width: 320px;
+        }
+
+        /* 快捷键提示 */
+        .shortcut-hint {
+            position: fixed;
+            bottom: 100px;
+            right: 20px;
+            padding: 8px 12px;
+            background: var(--bg-darker);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+            font-size: 12px;
+            color: var(--text-secondary);
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s;
+        }
+
+        .shortcut-hint.show {
+            opacity: 1;
+        }
+
+        /* 打字机效果 */
+        .typing-indicator {
+            display: inline-flex;
+            gap: 4px;
+            padding: 8px 12px;
+            background: var(--bg-light);
+            border-radius: var(--radius);
+        }
+
+        .typing-dot {
+            width: 6px;
+            height: 6px;
+            background: var(--text-secondary);
+            border-radius: 50%;
+            animation: typing 1.4s infinite;
+        }
+
+        .typing-dot:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+
+        .typing-dot:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+
+        @keyframes typing {
+            0%, 60%, 100% {
+                transform: translateY(0);
+                opacity: 0.5;
+            }
+            30% {
+                transform: translateY(-10px);
+                opacity: 1;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- 左侧导航栏 -->
+        <div class="sidebar">
+            <a href="index.html" class="sidebar-item active">
+                <span class="sidebar-icon">💬</span>
+                <span class="sidebar-text">对话</span>
+            </a>
+            <a href="assistants.html" class="sidebar-item">
+                <span class="sidebar-icon">🤖</span>
+                <span class="sidebar-text">助手</span>
+            </a>
+            <a href="sessions.html" class="sidebar-item">
+                <span class="sidebar-icon">📚</span>
+                <span class="sidebar-text">会话</span>
+            </a>
+            <a href="knowledge.html" class="sidebar-item">
+                <span class="sidebar-icon">📖</span>
+                <span class="sidebar-text">知识库</span>
+            </a>
+            <a href="tools-sidebar.html" class="sidebar-item">
+                <span class="sidebar-icon">🛠️</span>
+                <span class="sidebar-text">工具</span>
+            </a>
+            <a href="logs.html" class="sidebar-item">
+                <span class="sidebar-icon">📋</span>
+                <span class="sidebar-text">日志</span>
+            </a>
+            <a href="settings.html" class="sidebar-item">
+                <span class="sidebar-icon">⚙️</span>
+                <span class="sidebar-text">设置</span>
+            </a>
+            <div style="flex: 1;"></div>
+            <div class="sidebar-item" onclick="showCommandPalette()">
+                <span class="sidebar-icon">⌘</span>
+                <span class="sidebar-text">命令面板</span>
+            </div>
+        </div>
+
+        <!-- 主内容区 -->
+        <div class="main-content">
+            <!-- 顶部栏 -->
+            <div class="header">
+                <div class="header-left">
+                    <div class="logo">AI 控制台</div>
+                    <div class="provider-selector" onclick="toggleProviderMenu()">
+                        <span class="status-indicator status-success"></span>
+                        <span id="currentProvider">百炼 Qwen-Plus</span>
+                        <span>▼</span>
+                    </div>
+                </div>
+                <div class="header-right">
+                    <div class="status-bar">
+                        <span>会话: 1</span>
+                        <span>|</span>
+                        <span>消息: 0</span>
+                    </div>
+                    <button class="btn btn-secondary btn-small" onclick="newChat()">新建对话</button>
+                    <button class="btn btn-secondary btn-small" onclick="toggleToolsPanel()">工具 ▶</button>
+                </div>
+            </div>
+
+            <!-- 对话容器 -->
+            <div class="chat-container">
+                <div class="chat-main">
+                    <!-- 消息区 -->
+                    <div class="messages-area" id="messagesArea">
+                        <div class="welcome-screen" id="welcomeScreen">
+                            <div class="welcome-icon">🤖</div>
+                            <div class="welcome-title">欢迎使用 AI 控制台</div>
+                            <div>统一接入百炼与 Ollama，调用 MCP 工具，控制本地能力</div>
+                            
+                            <div class="quick-actions">
+                                <div class="quick-action" onclick="window.location.href='assistants.html'">
+                                    <div class="quick-action-title">🤖 AI 助手</div>
+                                    <div class="quick-action-desc">创建和管理专业助手</div>
+                                </div>
+                                <div class="quick-action" onclick="window.location.href='knowledge.html'">
+                                    <div class="quick-action-title">📖 知识库</div>
+                                    <div class="quick-action-desc">RAG 增强知识检索</div>
+                                </div>
+                                <div class="quick-action" onclick="quickAction('file')">
+                                    <div class="quick-action-title">📁 文件操作</div>
+                                    <div class="quick-action-desc">读取、搜索、管理文件</div>
+                                </div>
+                                <div class="quick-action" onclick="quickAction('script')">
+                                    <div class="quick-action-title">⚡ 执行脚本</div>
+                                    <div class="quick-action-desc">运行 PowerShell/Python 脚本</div>
+                                </div>
+                                <div class="quick-action" onclick="quickAction('mcp')">
+                                    <div class="quick-action-title">🔧 MCP 工具</div>
+                                    <div class="quick-action-desc">调用外部工具和服务</div>
+                                </div>
+                                <div class="quick-action" onclick="window.location.href='sessions.html'">
+                                    <div class="quick-action-title">📚 会话管理</div>
+                                    <div class="quick-action-desc">查看历史对话记录</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 输入区 -->
+                    <div class="input-area">
+                        <div class="input-wrapper">
+                            <div class="input-box">
+                                <div class="input-tools">
+                                    <button class="input-tool-btn" title="附加文件">📎 文件</button>
+                                    <button class="input-tool-btn" title="引用上下文">🔗 引用</button>
+                                    <button class="input-tool-btn" title="使用模板">📝 模板</button>
+                                    <button class="input-tool-btn" onclick="showCommandPalette()">⌘ 命令 (Ctrl+K)</button>
+                                </div>
+                                <textarea 
+                                    id="messageInput" 
+                                    placeholder="输入消息...支持自然语言或命令模式（/ps, /tool 等）"
+                                    onkeydown="handleInputKeydown(event)"
+                                ></textarea>
+                            </div>
+                            <button class="btn btn-primary send-btn" onclick="sendMessage()">
+                                <span id="sendBtnText">发送</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 右侧工具面板 -->
+                <div class="tools-panel" id="toolsPanel">
+                    <iframe src="tools-sidebar.html" style="width: 100%; height: 100%; border: none;"></iframe>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 快捷键提示 -->
+    <div class="shortcut-hint" id="shortcutHint">
+        按 Ctrl+K 打开命令面板
+    </div>
+
+    <script src="assets/common.js"></script>
+    <script>
+        let messages = [];
+        let isProcessing = false;
+
+        // 发送消息
+        function sendMessage() {
+            const input = document.getElementById('messageInput');
+            const content = input.value.trim();
+            
+            if (!content || isProcessing) return;
+            
+            // 隐藏欢迎屏幕
+            document.getElementById('welcomeScreen').style.display = 'none';
+            
+            // 添加用户消息
+            addMessage('user', content);
+            input.value = '';
+            
+            // 显示正在输入
+            showTypingIndicator();
+            
+            // 模拟AI响应
+            setTimeout(() => {
+                hideTypingIndicator();
+                handleAIResponse(content);
+            }, 1500);
+        }
+
+        // 添加消息
+        function addMessage(role, content) {
+            const messagesArea = document.getElementById('messagesArea');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message message-${role}`;
+            
+            const contentDiv = document.createElement('div');
+            contentDiv.className = 'message-content';
+            contentDiv.textContent = content;
+            
+            messageDiv.appendChild(contentDiv);
+            messagesArea.appendChild(messageDiv);
+            
+            // 滚动到底部
+            messagesArea.scrollTop = messagesArea.scrollHeight;
+            
+            messages.push({ role, content, timestamp: new Date() });
+        }
+
+        // 显示打字指示器
+        function showTypingIndicator() {
+            const messagesArea = document.getElementById('messagesArea');
+            const indicator = document.createElement('div');
+            indicator.id = 'typingIndicator';
+            indicator.className = 'message message-assistant';
+            indicator.innerHTML = `
+                <div class="typing-indicator">
+                    <div class="typing-dot"></div>
+                    <div class="typing-dot"></div>
+                    <div class="typing-dot"></div>
+                </div>
+            `;
+            messagesArea.appendChild(indicator);
+            messagesArea.scrollTop = messagesArea.scrollHeight;
+            isProcessing = true;
+        }
+
+        // 隐藏打字指示器
+        function hideTypingIndicator() {
+            const indicator = document.getElementById('typingIndicator');
+            if (indicator) indicator.remove();
+            isProcessing = false;
+        }
+
+        // 处理AI响应
+        function handleAIResponse(userInput) {
+            let response = '';
+            
+            // 简单的模拟响应
+            if (userInput.includes('文件') || userInput.includes('目录')) {
+                response = '我可以帮您进行文件操作。请告诉我具体需要：\n\n1. 读取文件内容\n2. 搜索文件\n3. 批量处理\n4. 文件管理\n\n需要我做什么呢？';
+            } else if (userInput.startsWith('/ps')) {
+                response = '准备执行 PowerShell 命令...\n\n⚠️ 此操作需要您的审批确认。';
+                setTimeout(() => window.open('approval-dialog.html', '_blank', 'width=600,height=400'), 1000);
+            } else if (userInput.includes('工具') || userInput.includes('MCP')) {
+                response = '已连接的 MCP 工具：\n\n✅ files - 文件操作\n✅ devops - DevOps 工具\n⚠️ database - 数据库（离线）\n\n您想使用哪个工具？';
+            } else {
+                response = `收到您的消息："${userInput}"\n\n我是 AI 控制台助手，可以帮您：\n- 管理文件和目录\n- 执行脚本和命令\n- 调用 MCP 工具\n- 控制本地系统能力\n\n请告诉我您需要什么帮助。`;
+            }
+            
+            addMessage('assistant', response);
+        }
+
+        // 快捷操作
+        function quickAction(type) {
+            const actions = {
+                file: '帮我搜索 D:\\WorkSpace 下的所有 .md 文件',
+                script: '/ps Get-Process | Sort-Object CPU -Descending | Select-Object -First 10',
+                mcp: '列出所有可用的 MCP 工具',
+                help: '显示使用帮助和示例'
+            };
+            document.getElementById('messageInput').value = actions[type] || '';
+            document.getElementById('messageInput').focus();
+        }
+
+        // 输入框快捷键
+        function handleInputKeydown(event) {
+            if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault();
+                sendMessage();
+            }
+        }
+
+        // 新建对话
+        function newChat() {
+            if (messages.length > 0) {
+                Utils.confirm('确定要开始新对话吗？当前对话将被保存。', () => {
+                    messages = [];
+                    document.getElementById('messagesArea').innerHTML = '';
+                    document.getElementById('welcomeScreen').style.display = 'flex';
+                    Utils.showToast('已开始新对话', 'success');
+                });
+            }
+        }
+
+        // 切换工具面板
+        function toggleToolsPanel() {
+            const panel = document.getElementById('toolsPanel');
+            panel.classList.toggle('open');
+        }
+
+        // 显示命令面板
+        function showCommandPalette() {
+            window.open('command-palette.html', '_blank', 'width=800,height=600');
+        }
+
+        // 切换 Provider 菜单
+        function toggleProviderMenu() {
+            Utils.showToast('模型切换功能开发中...', 'info');
+        }
+
+        // 快捷键
+        document.addEventListener('keydown', (e) => {
+            if (e.ctrlKey && e.key === 'k') {
+                e.preventDefault();
+                showCommandPalette();
+            }
+        });
+
+        // 显示快捷键提示
+        setTimeout(() => {
+            const hint = document.getElementById('shortcutHint');
+            hint.classList.add('show');
+            setTimeout(() => hint.classList.remove('show'), 3000);
+        }, 2000);
+    </script>
+</body>
+</html>
+

@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>工具侧栏</title>
+    <link rel="stylesheet" href="assets/common.css">
+    <style>
+        body {
+            margin: 0;
+            padding: 16px;
+            background: var(--bg-dark);
+        }
+
+        .tools-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+
+        .tools-title {
+            font-size: 16px;
+            font-weight: 600;
+        }
+
+        .search-box {
+            margin-bottom: 16px;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 8px 12px;
+            background: var(--bg-light);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+            color: var(--text-primary);
+            font-size: 13px;
+        }
+
+        .search-input:focus {
+            outline: none;
+            border-color: var(--primary-color);
+        }
+
+        .tabs {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 16px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .tab {
+            padding: 8px 12px;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            color: var(--text-secondary);
+            transition: all 0.3s;
+            font-size: 13px;
+        }
+
+        .tab:hover {
+            color: var(--text-primary);
+        }
+
+        .tab.active {
+            color: var(--primary-color);
+            border-bottom-color: var(--primary-color);
+        }
+
+        .tools-list {
+            max-height: calc(100vh - 200px);
+            overflow-y: auto;
+        }
+
+        .tool-group {
+            margin-bottom: 16px;
+        }
+
+        .tool-group-title {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .tool-item {
+            padding: 12px;
+            background: var(--bg-light);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+            margin-bottom: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .tool-item:hover {
+            border-color: var(--primary-color);
+            transform: translateX(4px);
+        }
+
+        .tool-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 4px;
+        }
+
+        .tool-name {
+            font-weight: 600;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .tool-status {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+
+        .tool-desc {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+        }
+
+        .tool-actions {
+            display: flex;
+            gap: 6px;
+        }
+
+        .tool-action-btn {
+            padding: 4px 8px;
+            background: var(--bg-darker);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            font-size: 11px;
+            cursor: pointer;
+            color: var(--text-secondary);
+            transition: all 0.3s;
+        }
+
+        .tool-action-btn:hover {
+            color: var(--text-primary);
+            border-color: var(--primary-color);
+        }
+
+        .mcp-server {
+            padding: 12px;
+            background: var(--bg-darker);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+            margin-bottom: 12px;
+        }
+
+        .mcp-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .mcp-name {
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .mcp-tools {
+            margin-top: 8px;
+            padding-left: 16px;
+        }
+
+        .mcp-tool {
+            padding: 6px 8px;
+            background: var(--bg-light);
+            border-radius: 4px;
+            margin-bottom: 4px;
+            font-size: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: var(--text-secondary);
+        }
+
+        .empty-icon {
+            font-size: 48px;
+            margin-bottom: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="tools-header">
+        <div class="tools-title">🛠️ 工具中心</div>
+        <button class="btn btn-secondary btn-small" onclick="refreshTools()">刷新</button>
+    </div>
+
+    <div class="search-box">
+        <input 
+            type="text" 
+            class="search-input" 
+            placeholder="搜索工具..." 
+            oninput="searchTools(this.value)"
+        >
+    </div>
+
+    <div class="tabs">
+        <div class="tab active" onclick="switchTab('all')">全部</div>
+        <div class="tab" onclick="switchTab('mcp')">MCP</div>
+        <div class="tab" onclick="switchTab('local')">本地</div>
+    </div>
+
+    <div class="tools-list" id="toolsList">
+        <!-- MCP 工具组 -->
+        <div class="tool-group" data-category="mcp">
+            <div class="tool-group-title">MCP 服务器</div>
+            
+            <div class="mcp-server">
+                <div class="mcp-header">
+                    <div class="mcp-name">
+                        <span class="status-indicator status-success"></span>
+                        files
+                    </div>
+                    <span class="tag tag-low">本地</span>
+                </div>
+                <div class="tool-desc">文件系统操作工具</div>
+                <div class="mcp-tools">
+                    <div class="mcp-tool">
+                        <span>fs.read</span>
+                        <button class="tool-action-btn" onclick="useTool('fs.read')">使用</button>
+                    </div>
+                    <div class="mcp-tool">
+                        <span>fs.write</span>
+                        <button class="tool-action-btn" onclick="useTool('fs.write')">使用</button>
+                    </div>
+                    <div class="mcp-tool">
+                        <span>fs.search</span>
+                        <button class="tool-action-btn" onclick="useTool('fs.search')">使用</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mcp-server">
+                <div class="mcp-header">
+                    <div class="mcp-name">
+                        <span class="status-indicator status-success"></span>
+                        devops
+                    </div>
+                    <span class="tag tag-medium">远程</span>
+                </div>
+                <div class="tool-desc">DevOps 工具集合</div>
+                <div class="mcp-tools">
+                    <div class="mcp-tool">
+                        <span>k8s.describe</span>
+                        <button class="tool-action-btn" onclick="useTool('k8s.describe')">使用</button>
+                    </div>
+                    <div class="mcp-tool">
+                        <span>jenkins.trigger</span>
+                        <button class="tool-action-btn" onclick="useTool('jenkins.trigger')">使用</button>
+                    </div>
+                    <div class="mcp-tool">
+                        <span>git.ops</span>
+                        <button class="tool-action-btn" onclick="useTool('git.ops')">使用</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mcp-server">
+                <div class="mcp-header">
+                    <div class="mcp-name">
+                        <span class="status-indicator status-offline"></span>
+                        database
+                    </div>
+                    <span class="tag tag-high">离线</span>
+                </div>
+                <div class="tool-desc">数据库操作工具（当前不可用）</div>
+            </div>
+        </div>
+
+        <!-- 本地工具组 -->
+        <div class="tool-group" data-category="local">
+            <div class="tool-group-title">本地控制能力</div>
+            
+            <div class="tool-item" onclick="showToolDetail('file-ops')">
+                <div class="tool-header">
+                    <div class="tool-name">
+                        📁 文件操作
+                        <span class="status-indicator status-success"></span>
+                    </div>
+                    <span class="tag tag-low">只读</span>
+                </div>
+                <div class="tool-desc">文件读取、搜索、目录浏览（白名单限制）</div>
+                <div class="tool-actions">
+                    <button class="tool-action-btn" onclick="event.stopPropagation(); useTool('file.read')">读取</button>
+                    <button class="tool-action-btn" onclick="event.stopPropagation(); useTool('file.search')">搜索</button>
+                    <button class="tool-action-btn" onclick="event.stopPropagation(); useTool('file.list')">列表</button>
+                </div>
+            </div>
+
+            <div class="tool-item" onclick="showToolDetail('shell')">
+                <div class="tool-header">
+                    <div class="tool-name">
+                        ⚡ Shell 脚本
+                        <span class="status-indicator status-warning"></span>
+                    </div>
+                    <span class="tag tag-medium">需审批</span>
+                </div>
+                <div class="tool-desc">执行 PowerShell/Bash 命令和脚本</div>
+                <div class="tool-actions">
+                    <button class="tool-action-btn" onclick="event.stopPropagation(); useTool('shell.ps')">PowerShell</button>
+                    <button class="tool-action-btn" onclick="event.stopPropagation(); useTool('shell.bash')">Bash</button>
+                    <button class="tool-action-btn" onclick="event.stopPropagation(); useTool('shell.python')">Python</button>
+                </div>
+            </div>
+
+            <div class="tool-item" onclick="showToolDetail('process')">
+                <div class="tool-header">
+                    <div class="tool-name">
+                        🔧 进程管理
+                        <span class="status-indicator status-success"></span>
+                    </div>
+                    <span class="tag tag-medium">部分只读</span>
+                </div>
+                <div class="tool-desc">查询、启动、结束进程</div>
+                <div class="tool-actions">
+                    <button class="tool-action-btn" onclick="event.stopPropagation(); useTool('process.list')">列表</button>
+                    <button class="tool-action-btn" onclick="event.stopPropagation(); useTool('process.start')">启动</button>
+                    <button class="tool-action-btn" onclick="event.stopPropagation(); useTool('process.kill')">结束</button>
+                </div>
+            </div>
+
+            <div class="tool-item" onclick="showToolDetail('network')">
+                <div class="tool-header">
+                    <div class="tool-name">
+                        🌐 网络工具
+                        <span class="status-indicator status-success"></span>
+                    </div>
+                    <span class="tag tag-low">安全</span>
+                </div>
+                <div class="tool-desc">HTTP 请求、端口扫描、网络诊断</div>
+                <div class="tool-actions">
+                    <button class="tool-action-btn" onclick="event.stopPropagation(); useTool('net.http')">HTTP</button>
+                    <button class="tool-action-btn" onclick="event.stopPropagation(); useTool('net.port')">端口</button>
+                    <button class="tool-action-btn" onclick="event.stopPropagation(); useTool('net.ping')">Ping</button>
+                </div>
+            </div>
+
+            <div class="tool-item" onclick="showToolDetail('clipboard')">
+                <div class="tool-header">
+                    <div class="tool-name">
+                        📋 剪贴板
+                        <span class="status-indicator status-success"></span>
+                    </div>
+                    <span class="tag tag-low">安全</span>
+                </div>
+                <div class="tool-desc">读取和写入系统剪贴板</div>
+                <div class="tool-actions">
+                    <button class="tool-action-btn" onclick="event.stopPropagation(); useTool('clipboard.read')">读取</button>
+                    <button class="tool-action-btn" onclick="event.stopPropagation(); useTool('clipboard.write')">写入</button>
+                </div>
+            </div>
+
+            <div class="tool-item" onclick="showToolDetail('ui-auto')">
+                <div class="tool-header">
+                    <div class="tool-name">
+                        🖱️ UI 自动化
+                        <span class="status-indicator status-warning"></span>
+                    </div>
+                    <span class="tag tag-high">需审批</span>
+                </div>
+                <div class="tool-desc">窗口操作、截图、OCR（可选功能）</div>
+                <div class="tool-actions">
+                    <button class="tool-action-btn" onclick="event.stopPropagation(); useTool('ui.screenshot')">截图</button>
+                    <button class="tool-action-btn" onclick="event.stopPropagation(); useTool('ui.window')">窗口</button>
+                    <button class="tool-action-btn" onclick="event.stopPropagation(); useTool('ui.ocr')">OCR</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="assets/common.js"></script>
+    <script>
+        let currentTab = 'all';
+
+        // 切换标签
+        function switchTab(tab) {
+            currentTab = tab;
+            
+            // 更新标签样式
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            // 过滤工具组
+            const groups = document.querySelectorAll('.tool-group');
+            groups.forEach(group => {
+                const category = group.dataset.category;
+                if (tab === 'all' || tab === category) {
+                    group.style.display = 'block';
+                } else {
+                    group.style.display = 'none';
+                }
+            });
+        }
+
+        // 搜索工具
+        function searchTools(query) {
+            query = query.toLowerCase();
+            const items = document.querySelectorAll('.tool-item, .mcp-server');
+            
+            items.forEach(item => {
+                const text = item.textContent.toLowerCase();
+                item.style.display = text.includes(query) ? 'block' : 'none';
+            });
+        }
+
+        // 使用工具
+        function useTool(toolName) {
+            if (window.parent) {
+                // 如果在 iframe 中，通知父窗口
+                window.parent.postMessage({
+                    type: 'useTool',
+                    tool: toolName
+                }, '*');
+            }
+            Utils.showToast(`准备使用工具: ${toolName}`, 'info');
+        }
+
+        // 显示工具详情
+        function showToolDetail(toolId) {
+            Utils.showToast('工具详情功能开发中...', 'info');
+        }
+
+        // 刷新工具列表
+        function refreshTools() {
+            Utils.showToast('正在刷新工具列表...', 'info');
+            
+            // 模拟刷新
+            setTimeout(() => {
+                Utils.showToast('工具列表已更新', 'success');
+            }, 1000);
+        }
+    </script>
+</body>
+</html>
+

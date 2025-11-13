@@ -41,7 +41,11 @@ class SidebarWidget(QWidget):
         nav_buttons = [
             ("💬 对话", "chat"),
             ("🤖 助手", "assistants"),
+            ("🤵 智能体", "agents"),
             ("📚 会话", "sessions"),
+            ("📊 运行记录", "jobs"),
+            ("🔗 连接器", "connectors"),
+            ("🤖 自动化", "automation"),
             ("📖 知识库", "knowledge"),
             ("🔧 工具", "tools"),
             ("📋 日志", "logs"),

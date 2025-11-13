@@ -12,6 +12,7 @@ from ..mcp import McpClient, McpRegistry
 from ..localops import FileSystemOps, ShellOps, ProcessOps, NetworkOps
 from ..security import SecurityGuard, ApprovalRequest, ApprovalResult, RiskLevel
 from ..store import DatabaseManager, Session, Message, ToolCall
+from .agent_runner import AgentRunner
 
 
 class Orchestrator:
@@ -39,6 +40,14 @@ class Orchestrator:
         )
         self.process_ops = ProcessOps()
         self.network_ops = NetworkOps()
+
+        # 初始化 AgentRunner
+        self.agent_runner = AgentRunner(
+            db_manager=self.db_manager,
+            provider_manager=self.provider_manager,
+            security_guard=self.security_guard,
+            tool_executor=self._execute_tool_internal,
+        )
 
         # 当前会话
         self.current_session_id: Optional[str] = None
@@ -411,6 +420,36 @@ class Orchestrator:
 
         else:
             return {"success": False, "error": f"未知工具: {tool_name}"}
+
+    async def run_agent(
+        self,
+        agent_id: str,
+        goal: str,
+        session_id: Optional[str] = None,
+        context: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        """运行智能体
+
+        Args:
+            agent_id: 智能体ID
+            goal: 用户目标描述
+            session_id: 会话ID(可选)
+            context: 额外上下文(可选)
+
+        Returns:
+            执行结果字典
+        """
+        session_id = session_id or self.current_session_id
+
+        if not session_id:
+            session_id = await self.create_session(title=f"Agent: {goal[:50]}")
+
+        return await self.agent_runner.run_agent(
+            agent_id=agent_id,
+            goal=goal,
+            session_id=session_id,
+            context=context,
+        )
 
     async def health_check(self) -> Dict[str, Any]:
         """健康检查

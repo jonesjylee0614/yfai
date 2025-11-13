@@ -246,6 +246,219 @@ class KVStore(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
+class Agent(Base):
+    """智能体配置表"""
+
+    __tablename__ = "agents"
+
+    id = Column(String(36), primary_key=True)
+    name = Column(String(100), nullable=False)
+    description = Column(Text, nullable=True)
+    system_prompt = Column(Text, nullable=False)
+    default_model = Column(String(100), nullable=True)
+    default_provider = Column(String(50), nullable=True)  # bailian / ollama / auto
+    allowed_tools = Column(Text, nullable=False)  # JSON array
+    max_steps = Column(Integer, default=10)
+    stop_condition = Column(Text, nullable=True)  # JSON
+    is_enabled = Column(Boolean, default=True)
+    risk_level = Column(String(20), default="medium")  # low / medium / high
+    tags = Column(Text, nullable=True)  # JSON array
+    usage_count = Column(Integer, default=0)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    last_used_at = Column(DateTime, nullable=True)
+
+    # 关系
+    job_runs = relationship("JobRun", back_populates="agent")
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "id": self.id,
+            "name": self.name,
+            "description": self.description,
+            "system_prompt": self.system_prompt,
+            "default_model": self.default_model,
+            "default_provider": self.default_provider,
+            "allowed_tools": json.loads(self.allowed_tools) if self.allowed_tools else [],
+            "max_steps": self.max_steps,
+            "stop_condition": json.loads(self.stop_condition) if self.stop_condition else None,
+            "is_enabled": self.is_enabled,
+            "risk_level": self.risk_level,
+            "tags": json.loads(self.tags) if self.tags else [],
+            "usage_count": self.usage_count,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+            "last_used_at": self.last_used_at.isoformat() if self.last_used_at else None,
+        }
+
+
+class JobRun(Base):
+    """任务运行记录表"""
+
+    __tablename__ = "job_runs"
+
+    id = Column(String(36), primary_key=True)
+    type = Column(String(20), nullable=False)  # agent / automation / manual
+    name = Column(String(200), nullable=False)
+    status = Column(String(20), nullable=False)  # pending / running / success / failed / cancelled
+    agent_id = Column(String(36), ForeignKey("agents.id"), nullable=True)
+    automation_id = Column(String(36), nullable=True)  # 稍后添加 AutomationTask 表
+    session_id = Column(String(36), ForeignKey("sessions.id"), nullable=True)
+    goal = Column(Text, nullable=True)  # 用户目标/任务描述
+    plan = Column(Text, nullable=True)  # JSON: 计划步骤列表
+    summary = Column(Text, nullable=True)
+    error = Column(Text, nullable=True)
+    started_at = Column(DateTime, nullable=True)
+    ended_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    # 关系
+    agent = relationship("Agent", back_populates="job_runs")
+    session = relationship("Session")
+    steps = relationship("JobStep", back_populates="job_run", cascade="all, delete-orphan")
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "id": self.id,
+            "type": self.type,
+            "name": self.name,
+            "status": self.status,
+            "agent_id": self.agent_id,
+            "automation_id": self.automation_id,
+            "session_id": self.session_id,
+            "goal": self.goal,
+            "plan": json.loads(self.plan) if self.plan else None,
+            "summary": self.summary,
+            "error": self.error,
+            "started_at": self.started_at.isoformat() if self.started_at else None,
+            "ended_at": self.ended_at.isoformat() if self.ended_at else None,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+        }
+
+
+class JobStep(Base):
+    """任务步骤记录表"""
+
+    __tablename__ = "job_steps"
+
+    id = Column(String(36), primary_key=True)
+    job_id = Column(String(36), ForeignKey("job_runs.id"), nullable=False)
+    step_index = Column(Integer, nullable=False)
+    step_type = Column(String(50), nullable=False)  # tool / model / fs / shell / connector / etc
+    step_name = Column(String(200), nullable=False)
+    request_snapshot = Column(Text, nullable=True)  # JSON: 请求参数快照
+    response_snapshot = Column(Text, nullable=True)  # JSON: 响应结果快照
+    status = Column(String(20), nullable=False)  # pending / running / success / failed / skipped
+    approved_by = Column(String(50), nullable=True)  # user / auto / none
+    approval_decision = Column(String(20), nullable=True)  # once / permanent / rejected
+    error = Column(Text, nullable=True)
+    duration_ms = Column(Integer, nullable=True)
+    started_at = Column(DateTime, nullable=True)
+    ended_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    # 关系
+    job_run = relationship("JobRun", back_populates="steps")
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "id": self.id,
+            "job_id": self.job_id,
+            "step_index": self.step_index,
+            "step_type": self.step_type,
+            "step_name": self.step_name,
+            "request_snapshot": json.loads(self.request_snapshot) if self.request_snapshot else None,
+            "response_snapshot": json.loads(self.response_snapshot) if self.response_snapshot else None,
+            "status": self.status,
+            "approved_by": self.approved_by,
+            "approval_decision": self.approval_decision,
+            "error": self.error,
+            "duration_ms": self.duration_ms,
+            "started_at": self.started_at.isoformat() if self.started_at else None,
+            "ended_at": self.ended_at.isoformat() if self.ended_at else None,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+        }
+
+
+class AutomationTask(Base):
+    """自动化任务表"""
+
+    __tablename__ = "automation_tasks"
+
+    id = Column(String(36), primary_key=True)
+    name = Column(String(200), nullable=False)
+    description = Column(Text, nullable=True)
+    trigger_type = Column(String(20), nullable=False)  # cron / interval / once / file / process / webhook
+    cron_expr = Column(String(100), nullable=True)  # cron表达式
+    interval_seconds = Column(Integer, nullable=True)  # 间隔秒数
+    event_config = Column(Text, nullable=True)  # JSON: 事件配置(文件路径、进程名等)
+    agent_id = Column(String(36), ForeignKey("agents.id"), nullable=True)
+    goal = Column(Text, nullable=True)  # 要执行的目标
+    params = Column(Text, nullable=True)  # JSON: 额外参数
+    enabled = Column(Boolean, default=True)
+    last_run_at = Column(DateTime, nullable=True)
+    last_status = Column(String(20), nullable=True)  # success / failed
+    run_count = Column(Integer, default=0)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # 关系
+    agent = relationship("Agent")
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "id": self.id,
+            "name": self.name,
+            "description": self.description,
+            "trigger_type": self.trigger_type,
+            "cron_expr": self.cron_expr,
+            "interval_seconds": self.interval_seconds,
+            "event_config": json.loads(self.event_config) if self.event_config else None,
+            "agent_id": self.agent_id,
+            "goal": self.goal,
+            "params": json.loads(self.params) if self.params else None,
+            "enabled": self.enabled,
+            "last_run_at": self.last_run_at.isoformat() if self.last_run_at else None,
+            "last_status": self.last_status,
+            "run_count": self.run_count,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+        }
+
+
+class Connector(Base):
+    """连接器配置表"""
+
+    __tablename__ = "connectors"
+
+    id = Column(String(36), primary_key=True)
+    name = Column(String(100), nullable=False)
+    type = Column(String(50), nullable=False)  # email / git / http / custom
+    description = Column(Text, nullable=True)
+    config = Column(Text, nullable=False)  # JSON: 连接配置(URL、认证信息等)
+    status = Column(String(20), default="unknown")  # connected / disconnected / error / unknown
+    last_test_at = Column(DateTime, nullable=True)
+    last_used_at = Column(DateTime, nullable=True)
+    use_count = Column(Integer, default=0)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "id": self.id,
+            "name": self.name,
+            "type": self.type,
+            "description": self.description,
+            "config": json.loads(self.config) if self.config else {},
+            "status": self.status,
+            "last_test_at": self.last_test_at.isoformat() if self.last_test_at else None,
+            "last_used_at": self.last_used_at.isoformat() if self.last_used_at else None,
+            "use_count": self.use_count,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+        }
+
+
 class DatabaseManager:
     """数据库管理器"""
 
@@ -325,6 +538,57 @@ class DatabaseManager:
 
             session.commit()
 
+    def init_builtin_agents(self) -> None:
+        """初始化内置智能体"""
+        builtin_agents = [
+            {
+                "id": "agent-devops",
+                "name": "DevOps 助手",
+                "description": "能够拉仓库、本地构建、跑单测、压缩日志、生成报告",
+                "system_prompt": "你是一位资深的DevOps工程师，精通代码仓库管理、构建流程、测试执行和日志分析。你能帮助用户完成代码拉取、构建、测试和报告生成等任务。",
+                "default_model": "qwen2.5-coder",
+                "default_provider": "ollama",
+                "allowed_tools": json.dumps(["shell.execute", "fs.read_file", "fs.write_file", "fs.list_directory", "process.list", "net.http_request"]),
+                "max_steps": 15,
+                "risk_level": "medium",
+                "tags": json.dumps(["DevOps", "开发", "运维"]),
+            },
+            {
+                "id": "agent-knowledge",
+                "name": "知识整理助手",
+                "description": "扫描指定目录 Markdown/PDF，分块建库，定期总结变化",
+                "system_prompt": "你是一位专业的知识管理专家，擅长文档整理、信息提取和知识归纳。你能帮助用户扫描、索引和总结文档内容。",
+                "default_model": "qwen-plus",
+                "default_provider": "bailian",
+                "allowed_tools": json.dumps(["fs.read_file", "fs.list_directory", "fs.search_files"]),
+                "max_steps": 20,
+                "risk_level": "low",
+                "tags": json.dumps(["知识管理", "文档"]),
+            },
+            {
+                "id": "agent-syscheck",
+                "name": "系统巡检助手",
+                "description": "定时跑 CPU/RAM/磁盘/网络状态，生成日报写入本地文件",
+                "system_prompt": "你是一位专业的系统运维专家，擅长系统监控、性能分析和报告生成。你能帮助用户检查系统状态并生成详细报告。",
+                "default_model": "qwen2.5-coder",
+                "default_provider": "ollama",
+                "allowed_tools": json.dumps(["process.info", "process.list", "net.get_local_ip", "net.check_port", "fs.write_file"]),
+                "max_steps": 10,
+                "risk_level": "low",
+                "tags": json.dumps(["运维", "监控", "系统"]),
+            },
+        ]
+
+        with self.get_session() as session:
+            for agent_data in builtin_agents:
+                # 检查是否已存在
+                existing = session.query(Agent).filter_by(id=agent_data["id"]).first()
+                if not existing:
+                    agent = Agent(**agent_data)
+                    session.add(agent)
+
+            session.commit()
+
     def get_stats(self) -> Dict[str, Any]:
         """获取数据库统计信息"""
         with self.get_session() as session:
@@ -334,5 +598,10 @@ class DatabaseManager:
                 "tool_calls": session.query(ToolCall).count(),
                 "assistants": session.query(Assistant).count(),
                 "knowledge_bases": session.query(KnowledgeBase).count(),
+                "agents": session.query(Agent).count(),
+                "job_runs": session.query(JobRun).count(),
+                "job_steps": session.query(JobStep).count(),
+                "automation_tasks": session.query(AutomationTask).count(),
+                "connectors": session.query(Connector).count(),
             }
 

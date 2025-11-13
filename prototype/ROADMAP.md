@@ -2,7 +2,40 @@
 
 ## 📋 当前状态总结
 
-### ✅ 已实现功能 (v1.1.0)
+### ✅ Phase 0: 原型对齐 (v1.2.0 - 已完成 ✓)
+
+**交付物：** 已完成智能体工作台核心原型
+
+#### 新增原型页面
+- ✅ 智能体中心 (agents-center.html)
+  - Agent 定义与管理
+  - 多步 Workflow 执行
+  - 预置场景模板
+  - 执行计划可视化
+- ✅ 自动化中心 (automation.html)
+  - Cron/间隔/事件触发
+  - 任务调度管理
+  - 统计看板
+- ✅ 运行记录 (jobs.html)
+  - Job & JobStep 可视化
+  - 步骤时间线
+  - 一键重跑功能
+- ✅ 连接器管理 (connectors.html)
+  - 外部服务集成
+  - 配置测试管理
+- ✅ 增强审批弹窗
+  - 仅此一次/永久允许
+  - Agent 级权限授予
+
+#### 文档更新
+- ✅ FEATURES.md 已更新
+- ✅ ROADMAP.md 已更新
+
+**验收状态：** ✅ Phase 0 原型已完成，可进入 Phase 1 开发
+
+---
+
+### ✅ 已实现功能 (v1.1.0 - 基础版)
 - 对话交互系统
 - AI 助手管理
 - 会话历史管理
@@ -539,7 +572,161 @@ API 层：
 
 ---
 
-**文档版本**: v1.0  
-**最后更新**: 2025-11-12  
+## 🛠️ 实施路线图（依据改造建设方案）
+
+### Phase 1: Agent & JobRun 落地
+**预计时间：** 4-6 周
+
+#### 数据层
+- [ ] `yfai/store/db.py` 新增 Agent、JobRun、JobStep 表
+- [ ] 提供数据库迁移脚本
+- [ ] 建立数据模型关系
+
+#### 核心逻辑
+- [ ] `yfai/core/orchestrator.py` 引入 AgentRunner
+  - [ ] 依据系统提示词生成计划（Plan）
+  - [ ] 顺序/循环执行步骤
+  - [ ] 记录 JobStep
+- [ ] 与 `security/guard.py` 集成 agent 级工具白名单
+- [ ] 实现停止条件与错误处理
+
+#### UI 实现
+- [ ] 侧栏新增"智能体"入口
+- [ ] Agent 列表/详情页面
+- [ ] ChatWidget 支持 `/run-as-agent` 命令
+- [ ] Job 执行进度实时展示
+
+#### 测试
+- [ ] AgentRunner 单元测试
+- [ ] JobRun 写入集成测试
+- [ ] 端到端场景测试
+
+---
+
+### Phase 2: Automation & 场景模板
+**预计时间：** 4-6 周
+
+#### 调度框架
+- [ ] 新增 `yfai/automation/scheduler.py`
+  - [ ] 支持 cron 表达式
+  - [ ] 支持固定间隔
+  - [ ] 支持一次性任务
+- [ ] `AutomationTask` 表设计与实现
+- [ ] 任务持久化与恢复
+
+#### 触发器
+- [ ] 文件监听触发器（watchdog）
+- [ ] 进程状态触发器
+- [ ] HTTP Webhook 触发器
+- [ ] 统一调用 AgentRunner 或 Workflow
+
+#### 场景模板
+- [ ] DevOps 助手场景（代码拉取、构建、测试）
+- [ ] 系统巡检场景（资源监控、日报生成）
+- [ ] 知识整理场景（文档扫描、索引更新）
+
+#### UI 实现
+- [ ] Automation 管理页面
+- [ ] 任务创建向导
+- [ ] 统计看板与执行日志
+
+#### 配置与文档
+- [ ] `configs/config.example.yaml` 增加 automation 示例
+- [ ] 使用指南文档
+
+---
+
+### Phase 3: Connector Framework
+**预计时间：** 3-4 周
+
+#### 实现
+- [ ] `yfai/connectors/{base,email,git,http}.py`
+  - [ ] EmailConnector (SMTP/IMAP)
+  - [ ] GitConnector (clone/pull/push/commit)
+  - [ ] HttpConnector (REST API 调用)
+- [ ] `Connector` 表设计
+- [ ] LocalOps 新增 `connector.py` 对接
+
+#### UI 实现
+- [ ] 连接器管理页面
+- [ ] 创建/编辑/测试连接
+- [ ] 状态监控与统计
+
+#### 安全
+- [ ] Connector 调用审批体系
+- [ ] JobStep 记录调用快照
+- [ ] 敏感信息加密存储
+
+#### 扩展
+- [ ] 预留 MCP 暴露接口
+- [ ] 配置导入/导出功能
+
+---
+
+### Phase 4: 运行观测 & 权限体验完善
+**预计时间：** 3-4 周
+
+#### 运行中心
+- [ ] Job 列表/详情界面完善
+- [ ] 支持重跑、从指定 Step 继续
+- [ ] 展示每步输入输出
+- [ ] 搜索与过滤功能
+
+#### 审批体验
+- [ ] 审批弹窗支持"仅此一次/永久允许"（已完成原型）
+- [ ] 在 JobStep 中显示审批记录
+- [ ] 审批策略配置界面
+
+#### 安全策略
+- [ ] `security/policy.py` 增加 agent/task 级风险阈值
+- [ ] 默认危险工具列表配置
+- [ ] 权限审计报告
+
+---
+
+### Phase 5: 质量与发布
+**预计时间：** 2-3 周
+
+#### 测试
+- [ ] pytest 测试矩阵补全
+- [ ] 集成测试覆盖关键路径
+- [ ] Ruff/Mypy 代码质量检查
+- [ ] 关键模块测试覆盖率 > 80%
+
+#### 文档
+- [ ] 刷新 README.md
+- [ ] 更新 CHANGELOG.md
+- [ ] 更新 PROJECT_SUMMARY.md
+- [ ] 编写部署指南
+
+#### 发布
+- [ ] Release note 整理
+- [ ] 示例配置文件
+- [ ] 常见问题文档
+- [ ] 可复制部署验证
+
+---
+
+## 📊 里程碑依赖关系
+
+```
+Phase 0 (原型) ✅
+    ↓
+Phase 1 (Agent+Job) → 核心能力
+    ↓
+Phase 2 (Automation) → 自动化能力
+    ↓
+Phase 3 (Connector) → 外部集成
+    ↓
+Phase 4 (观测+安全) → 体验完善
+    ↓
+Phase 5 (质量+发布) → 生产就绪
+```
+
+---
+
+**文档版本**: v1.1
+**最后更新**: 2025-11-13
+**状态**: Phase 0 已完成，准备进入 Phase 1 开发
 **贡献者**: AI 控制台开发团队
 

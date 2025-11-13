@@ -1,0 +1,861 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>连接器 - AI 控制台</title>
+    <link rel="stylesheet" href="assets/common.css">
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: var(--bg-darker);
+            color: var(--text-primary);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }
+
+        .container {
+            display: flex;
+            height: 100vh;
+        }
+
+        /* 侧边栏 */
+        .sidebar {
+            width: 240px;
+            background: var(--bg-dark);
+            border-right: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .sidebar-header {
+            padding: 20px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .sidebar-header h2 {
+            margin: 0 0 10px 0;
+            font-size: 18px;
+            color: var(--text-primary);
+        }
+
+        .nav-item {
+            padding: 12px 20px;
+            cursor: pointer;
+            transition: all 0.2s;
+            border-left: 3px solid transparent;
+        }
+
+        .nav-item:hover {
+            background: var(--bg-light);
+        }
+
+        .nav-item.active {
+            background: var(--bg-light);
+            border-left-color: var(--primary-color);
+            color: var(--primary-color);
+        }
+
+        /* 主内容区 */
+        .main-content {
+            flex: 1;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            background: var(--bg-dark);
+            border-bottom: 1px solid var(--border-color);
+            padding: 20px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header h1 {
+            margin: 0;
+            font-size: 24px;
+            color: var(--text-primary);
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        .content-area {
+            flex: 1;
+            overflow-y: auto;
+            padding: 30px;
+        }
+
+        /* 连接器类型卡片 */
+        .connector-types {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+
+        .type-card {
+            background: var(--bg-dark);
+            border: 2px dashed var(--border-color);
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .type-card:hover {
+            border-color: var(--primary-color);
+            background: var(--bg-light);
+        }
+
+        .type-icon {
+            font-size: 40px;
+            margin-bottom: 10px;
+        }
+
+        .type-name {
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+
+        .type-description {
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        /* 连接器列表 */
+        .connectors-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: 20px;
+        }
+
+        .connector-card {
+            background: var(--bg-dark);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 20px;
+            transition: all 0.3s;
+        }
+
+        .connector-card:hover {
+            border-color: var(--primary-color);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 16px rgba(0,0,0,0.3);
+        }
+
+        .connector-header {
+            display: flex;
+            align-items: flex-start;
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+
+        .connector-icon {
+            font-size: 32px;
+        }
+
+        .connector-info {
+            flex: 1;
+        }
+
+        .connector-name {
+            font-size: 18px;
+            font-weight: 600;
+            margin: 0 0 8px 0;
+        }
+
+        .connector-type {
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .connector-status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            background: var(--bg-darker);
+            border-radius: 6px;
+            font-size: 13px;
+            margin-bottom: 15px;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+
+        .status-dot.connected {
+            background: var(--success-color);
+            box-shadow: 0 0 8px var(--success-color);
+        }
+
+        .status-dot.disconnected {
+            background: var(--danger-color);
+        }
+
+        .status-dot.testing {
+            background: var(--warning-color);
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                opacity: 1;
+            }
+            50% {
+                opacity: 0.3;
+            }
+        }
+
+        .connector-meta {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            font-size: 13px;
+            color: var(--text-secondary);
+            margin-bottom: 15px;
+        }
+
+        .meta-row {
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .connector-actions {
+            display: flex;
+            gap: 10px;
+            padding-top: 15px;
+            border-top: 1px solid var(--border-color);
+        }
+
+        /* 模态框 */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.7);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal.show {
+            display: flex;
+        }
+
+        .modal-content {
+            background: var(--bg-dark);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            width: 90%;
+            max-width: 700px;
+            max-height: 90vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .modal-header {
+            padding: 20px 30px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-header h2 {
+            margin: 0;
+            font-size: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .modal-body {
+            padding: 30px;
+            overflow-y: auto;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: var(--text-primary);
+            font-weight: 500;
+        }
+
+        .form-group input,
+        .form-group textarea,
+        .form-group select {
+            width: 100%;
+            padding: 10px 12px;
+            background: var(--bg-darker);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            color: var(--text-primary);
+            font-size: 14px;
+        }
+
+        .form-group textarea {
+            min-height: 100px;
+            resize: vertical;
+            font-family: 'Consolas', 'Monaco', monospace;
+        }
+
+        .form-help {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-top: 5px;
+        }
+
+        .test-result {
+            padding: 15px;
+            border-radius: 6px;
+            margin-top: 15px;
+            font-size: 14px;
+        }
+
+        .test-result.success {
+            background: rgba(82, 196, 26, 0.1);
+            border: 1px solid var(--success-color);
+            color: var(--success-color);
+        }
+
+        .test-result.error {
+            background: rgba(255, 77, 79, 0.1);
+            border: 1px solid var(--danger-color);
+            color: var(--danger-color);
+        }
+
+        .modal-footer {
+            padding: 20px 30px;
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .close-btn {
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            font-size: 24px;
+            cursor: pointer;
+            padding: 0;
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 4px;
+            transition: all 0.2s;
+        }
+
+        .close-btn:hover {
+            background: var(--bg-light);
+            color: var(--text-primary);
+        }
+
+        .config-template {
+            background: var(--bg-darker);
+            padding: 15px;
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-top: 10px;
+        }
+
+        .section-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin: 30px 0 15px 0;
+            padding-bottom: 10px;
+            border-bottom: 1px solid var(--border-color);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- 侧边栏 -->
+        <div class="sidebar">
+            <div class="sidebar-header">
+                <h2>🏠 AI 控制台</h2>
+                <div style="font-size: 12px; color: var(--text-secondary);">连接器管理</div>
+            </div>
+            <div class="nav-item" onclick="window.location.href='agents-center.html'">🤖 智能体中心</div>
+            <div class="nav-item" onclick="window.location.href='index.html'">💬 对话</div>
+            <div class="nav-item" onclick="window.location.href='assistants.html'">🎯 助手</div>
+            <div class="nav-item" onclick="window.location.href='automation.html'">⚡ 自动化</div>
+            <div class="nav-item" onclick="window.location.href='jobs.html'">📊 运行记录</div>
+            <div class="nav-item" onclick="window.location.href='knowledge.html'">📚 知识库</div>
+            <div class="nav-item active">🔌 连接器</div>
+            <div class="nav-item" onclick="window.location.href='sessions.html'">📖 会话</div>
+            <div class="nav-item" onclick="window.location.href='logs.html'">📋 日志</div>
+            <div class="nav-item" onclick="window.location.href='settings.html'">⚙️ 设置</div>
+        </div>
+
+        <!-- 主内容区 -->
+        <div class="main-content">
+            <div class="header">
+                <div>
+                    <h1>🔌 连接器管理</h1>
+                    <div style="color: var(--text-secondary); margin-top: 5px; font-size: 14px;">
+                        统一管理外部服务和系统集成
+                    </div>
+                </div>
+                <div class="header-actions">
+                    <button class="btn btn-secondary" onclick="importConnector()">
+                        📥 导入配置
+                    </button>
+                </div>
+            </div>
+
+            <div class="content-area">
+                <!-- 新增连接器类型 -->
+                <div class="section-title">➕ 添加新连接器</div>
+                <div class="connector-types">
+                    <div class="type-card" onclick="createConnector('email')">
+                        <div class="type-icon">📧</div>
+                        <div class="type-name">邮件服务</div>
+                        <div class="type-description">收发邮件、搜索</div>
+                    </div>
+                    <div class="type-card" onclick="createConnector('git')">
+                        <div class="type-icon">🔀</div>
+                        <div class="type-name">Git 仓库</div>
+                        <div class="type-description">代码管理、提交</div>
+                    </div>
+                    <div class="type-card" onclick="createConnector('http')">
+                        <div class="type-icon">🌐</div>
+                        <div class="type-name">HTTP API</div>
+                        <div class="type-description">REST/GraphQL</div>
+                    </div>
+                    <div class="type-card" onclick="createConnector('database')">
+                        <div class="type-icon">🗄️</div>
+                        <div class="type-name">数据库</div>
+                        <div class="type-description">SQL 查询、备份</div>
+                    </div>
+                    <div class="type-card" onclick="createConnector('cloud')">
+                        <div class="type-icon">☁️</div>
+                        <div class="type-name">云存储</div>
+                        <div class="type-description">OSS/S3/MinIO</div>
+                    </div>
+                    <div class="type-card" onclick="createConnector('notes')">
+                        <div class="type-icon">📝</div>
+                        <div class="type-name">笔记应用</div>
+                        <div class="type-description">Notion/飞书</div>
+                    </div>
+                </div>
+
+                <!-- 已有连接器 -->
+                <div class="section-title">🔗 已配置的连接器</div>
+                <div class="connectors-grid" id="connectorsGrid">
+                    <!-- 连接器卡片将由 JS 生成 -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 创建/编辑连接器模态框 -->
+    <div class="modal" id="connectorModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modalTitle"><span id="modalIcon">🔌</span> 创建连接器</h2>
+                <button class="close-btn" onclick="closeModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="connectorForm">
+                    <div class="form-group">
+                        <label>连接器名称 *</label>
+                        <input type="text" id="connectorName" placeholder="例如：公司邮箱" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label>描述</label>
+                        <textarea id="connectorDescription" placeholder="描述这个连接器的用途..." rows="2"></textarea>
+                    </div>
+
+                    <div id="configFields">
+                        <!-- 配置字段将根据类型动态生成 -->
+                    </div>
+
+                    <div class="form-group" id="testResultContainer" style="display: none;">
+                        <div id="testResult"></div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="testConnection()">
+                    🔍 测试连接
+                </button>
+                <div style="display: flex; gap: 10px;">
+                    <button class="btn btn-secondary" onclick="closeModal()">取消</button>
+                    <button class="btn btn-primary" onclick="saveConnector()">保存</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="assets/common.js"></script>
+    <script>
+        // 示例数据
+        const connectors = [
+            {
+                id: 'conn-1',
+                name: '公司邮箱',
+                type: 'email',
+                icon: '📧',
+                status: 'connected',
+                config: {
+                    server: 'smtp.company.com',
+                    port: 587,
+                    username: 'user@company.com'
+                },
+                lastUsed: '2 小时前',
+                callCount: 45
+            },
+            {
+                id: 'conn-2',
+                name: '项目代码仓库',
+                type: 'git',
+                icon: '🔀',
+                status: 'connected',
+                config: {
+                    url: 'https://github.com/company/project.git',
+                    branch: 'main'
+                },
+                lastUsed: '30 分钟前',
+                callCount: 128
+            },
+            {
+                id: 'conn-3',
+                name: '第三方 API',
+                type: 'http',
+                icon: '🌐',
+                status: 'connected',
+                config: {
+                    baseUrl: 'https://api.example.com',
+                    auth: 'Bearer token'
+                },
+                lastUsed: '1 小时前',
+                callCount: 234
+            },
+            {
+                id: 'conn-4',
+                name: '生产数据库',
+                type: 'database',
+                icon: '🗄️',
+                status: 'connected',
+                config: {
+                    host: 'db.company.com',
+                    port: 5432,
+                    database: 'production'
+                },
+                lastUsed: '5 分钟前',
+                callCount: 89
+            },
+            {
+                id: 'conn-5',
+                name: 'OSS 存储',
+                type: 'cloud',
+                icon: '☁️',
+                status: 'disconnected',
+                config: {
+                    endpoint: 'oss-cn-hangzhou.aliyuncs.com',
+                    bucket: 'my-bucket'
+                },
+                lastUsed: '3 天前',
+                callCount: 12
+            },
+            {
+                id: 'conn-6',
+                name: 'Notion 工作区',
+                type: 'notes',
+                icon: '📝',
+                status: 'connected',
+                config: {
+                    apiKey: '***',
+                    workspace: 'My Workspace'
+                },
+                lastUsed: '昨天',
+                callCount: 34
+            }
+        ];
+
+        let currentConnectorType = null;
+
+        // 配置模板
+        const configTemplates = {
+            email: {
+                fields: [
+                    { name: 'server', label: 'SMTP 服务器', type: 'text', placeholder: 'smtp.gmail.com' },
+                    { name: 'port', label: '端口', type: 'number', placeholder: '587' },
+                    { name: 'username', label: '用户名', type: 'text', placeholder: 'user@example.com' },
+                    { name: 'password', label: '密码', type: 'password', placeholder: '***' },
+                    { name: 'useTLS', label: '使用 TLS', type: 'checkbox' }
+                ]
+            },
+            git: {
+                fields: [
+                    { name: 'url', label: '仓库 URL', type: 'text', placeholder: 'https://github.com/user/repo.git' },
+                    { name: 'branch', label: '默认分支', type: 'text', placeholder: 'main' },
+                    { name: 'username', label: '用户名', type: 'text', placeholder: 'git username' },
+                    { name: 'token', label: '访问令牌', type: 'password', placeholder: 'Personal Access Token' }
+                ]
+            },
+            http: {
+                fields: [
+                    { name: 'baseUrl', label: 'Base URL', type: 'text', placeholder: 'https://api.example.com' },
+                    { name: 'authType', label: '认证类型', type: 'select', options: ['None', 'Bearer Token', 'API Key', 'Basic Auth'] },
+                    { name: 'authValue', label: '认证值', type: 'password', placeholder: 'Token or API Key' },
+                    { name: 'headers', label: '自定义 Headers (JSON)', type: 'textarea', placeholder: '{"Content-Type": "application/json"}' }
+                ]
+            },
+            database: {
+                fields: [
+                    { name: 'type', label: '数据库类型', type: 'select', options: ['PostgreSQL', 'MySQL', 'SQLite', 'MongoDB'] },
+                    { name: 'host', label: '主机', type: 'text', placeholder: 'localhost' },
+                    { name: 'port', label: '端口', type: 'number', placeholder: '5432' },
+                    { name: 'database', label: '数据库名', type: 'text', placeholder: 'mydb' },
+                    { name: 'username', label: '用户名', type: 'text', placeholder: 'dbuser' },
+                    { name: 'password', label: '密码', type: 'password', placeholder: '***' }
+                ]
+            },
+            cloud: {
+                fields: [
+                    { name: 'provider', label: '云服务商', type: 'select', options: ['阿里云 OSS', 'AWS S3', 'MinIO'] },
+                    { name: 'endpoint', label: 'Endpoint', type: 'text', placeholder: 'oss-cn-hangzhou.aliyuncs.com' },
+                    { name: 'bucket', label: 'Bucket 名称', type: 'text', placeholder: 'my-bucket' },
+                    { name: 'accessKey', label: 'Access Key', type: 'text', placeholder: 'LTAI...' },
+                    { name: 'secretKey', label: 'Secret Key', type: 'password', placeholder: '***' }
+                ]
+            },
+            notes: {
+                fields: [
+                    { name: 'provider', label: '笔记应用', type: 'select', options: ['Notion', '飞书文档', 'Confluence'] },
+                    { name: 'apiKey', label: 'API Key', type: 'password', placeholder: 'secret_...' },
+                    { name: 'workspace', label: '工作区', type: 'text', placeholder: 'My Workspace' },
+                    { name: 'rootPage', label: '根页面 ID', type: 'text', placeholder: 'page-id' }
+                ]
+            }
+        };
+
+        // 渲染连接器列表
+        function renderConnectors() {
+            const grid = document.getElementById('connectorsGrid');
+            if (connectors.length === 0) {
+                grid.innerHTML = '<div style="grid-column: 1 / -1; text-align: center; padding: 60px; color: var(--text-secondary);">还没有配置任何连接器</div>';
+                return;
+            }
+
+            grid.innerHTML = connectors.map(conn => `
+                <div class="connector-card">
+                    <div class="connector-header">
+                        <div class="connector-icon">${conn.icon}</div>
+                        <div class="connector-info">
+                            <h3 class="connector-name">${conn.name}</h3>
+                            <div class="connector-type">${getTypeName(conn.type)}</div>
+                        </div>
+                    </div>
+
+                    <div class="connector-status">
+                        <div class="status-dot ${conn.status}"></div>
+                        <span>${conn.status === 'connected' ? '✅ 已连接' : '❌ 未连接'}</span>
+                    </div>
+
+                    <div class="connector-meta">
+                        <div class="meta-row">
+                            <span>最后使用:</span>
+                            <span>${conn.lastUsed}</span>
+                        </div>
+                        <div class="meta-row">
+                            <span>调用次数:</span>
+                            <span>${conn.callCount} 次</span>
+                        </div>
+                    </div>
+
+                    <div class="connector-actions">
+                        <button class="btn btn-sm btn-secondary" onclick="testConnector('${conn.id}')">
+                            🔍 测试
+                        </button>
+                        <button class="btn btn-sm btn-secondary" onclick="editConnector('${conn.id}')">
+                            ✏️ 编辑
+                        </button>
+                        <button class="btn btn-sm btn-danger" onclick="deleteConnector('${conn.id}')">
+                            🗑️ 删除
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function getTypeName(type) {
+            const names = {
+                'email': '📧 邮件服务',
+                'git': '🔀 Git 仓库',
+                'http': '🌐 HTTP API',
+                'database': '🗄️ 数据库',
+                'cloud': '☁️ 云存储',
+                'notes': '📝 笔记应用'
+            };
+            return names[type] || type;
+        }
+
+        // 创建连接器
+        function createConnector(type) {
+            currentConnectorType = type;
+            const icons = { email: '📧', git: '🔀', http: '🌐', database: '🗄️', cloud: '☁️', notes: '📝' };
+
+            document.getElementById('modalIcon').textContent = icons[type];
+            document.getElementById('modalTitle').innerHTML = `${icons[type]} 创建 ${getTypeName(type)}`;
+            document.getElementById('connectorForm').reset();
+            document.getElementById('testResultContainer').style.display = 'none';
+
+            renderConfigFields(type);
+            document.getElementById('connectorModal').classList.add('show');
+        }
+
+        // 渲染配置字段
+        function renderConfigFields(type) {
+            const template = configTemplates[type];
+            if (!template) return;
+
+            const html = template.fields.map(field => {
+                if (field.type === 'select') {
+                    return `
+                        <div class="form-group">
+                            <label>${field.label}</label>
+                            <select name="${field.name}">
+                                ${field.options.map(opt => `<option>${opt}</option>`).join('')}
+                            </select>
+                        </div>
+                    `;
+                } else if (field.type === 'checkbox') {
+                    return `
+                        <div class="form-group">
+                            <label style="display: flex; align-items: center; gap: 10px;">
+                                <input type="checkbox" name="${field.name}" style="width: auto;">
+                                <span>${field.label}</span>
+                            </label>
+                        </div>
+                    `;
+                } else if (field.type === 'textarea') {
+                    return `
+                        <div class="form-group">
+                            <label>${field.label}</label>
+                            <textarea name="${field.name}" placeholder="${field.placeholder}" rows="4"></textarea>
+                        </div>
+                    `;
+                } else {
+                    return `
+                        <div class="form-group">
+                            <label>${field.label}</label>
+                            <input type="${field.type}" name="${field.name}" placeholder="${field.placeholder}">
+                        </div>
+                    `;
+                }
+            }).join('');
+
+            document.getElementById('configFields').innerHTML = html;
+        }
+
+        // 编辑连接器
+        function editConnector(id) {
+            const conn = connectors.find(c => c.id === id);
+            if (!conn) return;
+
+            currentConnectorType = conn.type;
+            const icons = { email: '📧', git: '🔀', http: '🌐', database: '🗄️', cloud: '☁️', notes: '📝' };
+
+            document.getElementById('modalIcon').textContent = icons[conn.type];
+            document.getElementById('modalTitle').innerHTML = `${icons[conn.type]} 编辑 ${conn.name}`;
+            document.getElementById('connectorName').value = conn.name;
+            document.getElementById('testResultContainer').style.display = 'none';
+
+            renderConfigFields(conn.type);
+            document.getElementById('connectorModal').classList.add('show');
+        }
+
+        // 测试连接
+        function testConnection() {
+            const container = document.getElementById('testResultContainer');
+            const result = document.getElementById('testResult');
+
+            container.style.display = 'block';
+            result.className = 'test-result';
+            result.innerHTML = '🔍 正在测试连接...';
+
+            setTimeout(() => {
+                const success = Math.random() > 0.3;
+                if (success) {
+                    result.className = 'test-result success';
+                    result.innerHTML = '✅ 连接测试成功!';
+                } else {
+                    result.className = 'test-result error';
+                    result.innerHTML = '❌ 连接失败: 无法连接到服务器，请检查配置';
+                }
+            }, 1500);
+        }
+
+        // 测试现有连接器
+        function testConnector(id) {
+            Utils.showToast('正在测试连接...', 'info');
+            setTimeout(() => {
+                Utils.showToast('连接测试成功', 'success');
+            }, 1000);
+        }
+
+        // 保存连接器
+        function saveConnector() {
+            const name = document.getElementById('connectorName').value;
+            if (!name) {
+                Utils.showToast('请输入连接器名称', 'warning');
+                return;
+            }
+
+            Utils.showToast('连接器已保存', 'success');
+            closeModal();
+        }
+
+        // 删除连接器
+        function deleteConnector(id) {
+            if (confirm('确定要删除这个连接器吗?')) {
+                const index = connectors.findIndex(c => c.id === id);
+                if (index !== -1) {
+                    connectors.splice(index, 1);
+                    renderConnectors();
+                    Utils.showToast('连接器已删除', 'success');
+                }
+            }
+        }
+
+        // 导入连接器
+        function importConnector() {
+            Utils.showToast('导入功能开发中...', 'info');
+        }
+
+        // 关闭模态框
+        function closeModal() {
+            document.getElementById('connectorModal').classList.remove('show');
+        }
+
+        // 初始化
+        renderConnectors();
+    </script>
+</body>
+</html>

@@ -1,0 +1,939 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>智能体中心 - AI 控制台</title>
+    <link rel="stylesheet" href="assets/common.css">
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: var(--bg-darker);
+            color: var(--text-primary);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }
+
+        .container {
+            display: flex;
+            height: 100vh;
+        }
+
+        /* 侧边栏 */
+        .sidebar {
+            width: 240px;
+            background: var(--bg-dark);
+            border-right: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .sidebar-header {
+            padding: 20px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .sidebar-header h2 {
+            margin: 0 0 10px 0;
+            font-size: 18px;
+            color: var(--text-primary);
+        }
+
+        .nav-item {
+            padding: 12px 20px;
+            cursor: pointer;
+            transition: all 0.2s;
+            border-left: 3px solid transparent;
+        }
+
+        .nav-item:hover {
+            background: var(--bg-light);
+        }
+
+        .nav-item.active {
+            background: var(--bg-light);
+            border-left-color: var(--primary-color);
+            color: var(--primary-color);
+        }
+
+        /* 主内容区 */
+        .main-content {
+            flex: 1;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            background: var(--bg-dark);
+            border-bottom: 1px solid var(--border-color);
+            padding: 20px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header h1 {
+            margin: 0;
+            font-size: 24px;
+            color: var(--text-primary);
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        .content-area {
+            flex: 1;
+            overflow-y: auto;
+            padding: 30px;
+        }
+
+        /* 智能体卡片 */
+        .agents-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .agent-card {
+            background: var(--bg-dark);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 20px;
+            transition: all 0.3s;
+            position: relative;
+        }
+
+        .agent-card:hover {
+            border-color: var(--primary-color);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 16px rgba(0,0,0,0.3);
+        }
+
+        .agent-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 15px;
+        }
+
+        .agent-icon {
+            font-size: 32px;
+            margin-right: 15px;
+        }
+
+        .agent-info {
+            flex: 1;
+        }
+
+        .agent-name {
+            font-size: 18px;
+            font-weight: 600;
+            margin: 0 0 8px 0;
+            color: var(--text-primary);
+        }
+
+        .agent-description {
+            color: var(--text-secondary);
+            font-size: 14px;
+            line-height: 1.5;
+            margin-bottom: 15px;
+        }
+
+        .agent-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 15px;
+        }
+
+        .meta-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .agent-tools {
+            margin-bottom: 15px;
+        }
+
+        .tools-label {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+        }
+
+        .tools-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+
+        .tool-tag {
+            padding: 4px 8px;
+            background: var(--bg-light);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            font-size: 11px;
+            color: var(--text-secondary);
+        }
+
+        .agent-actions {
+            display: flex;
+            gap: 10px;
+            padding-top: 15px;
+            border-top: 1px solid var(--border-color);
+        }
+
+        .toggle-switch {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            width: 44px;
+            height: 24px;
+            background: var(--border-color);
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .toggle-switch.active {
+            background: var(--success-color);
+        }
+
+        .toggle-switch::after {
+            content: '';
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            width: 20px;
+            height: 20px;
+            background: white;
+            border-radius: 50%;
+            transition: all 0.3s;
+        }
+
+        .toggle-switch.active::after {
+            left: 22px;
+        }
+
+        /* 模态框 */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.7);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal.show {
+            display: flex;
+        }
+
+        .modal-content {
+            background: var(--bg-dark);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            width: 90%;
+            max-width: 800px;
+            max-height: 90vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .modal-header {
+            padding: 20px 30px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-header h2 {
+            margin: 0;
+            font-size: 20px;
+        }
+
+        .modal-body {
+            padding: 30px;
+            overflow-y: auto;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: var(--text-primary);
+            font-weight: 500;
+        }
+
+        .form-group input,
+        .form-group textarea,
+        .form-group select {
+            width: 100%;
+            padding: 10px 12px;
+            background: var(--bg-darker);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            color: var(--text-primary);
+            font-size: 14px;
+        }
+
+        .form-group textarea {
+            min-height: 100px;
+            resize: vertical;
+            font-family: 'Consolas', 'Monaco', monospace;
+        }
+
+        .form-help {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-top: 5px;
+        }
+
+        .tools-selector {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .tool-checkbox {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px;
+            background: var(--bg-darker);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .tool-checkbox:hover {
+            background: var(--bg-light);
+        }
+
+        .tool-checkbox input[type="checkbox"] {
+            width: auto;
+        }
+
+        .modal-footer {
+            padding: 20px 30px;
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+
+        /* 执行计划视图 */
+        .plan-steps {
+            margin-top: 20px;
+        }
+
+        .step-item {
+            background: var(--bg-light);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 15px;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .step-number {
+            width: 32px;
+            height: 32px;
+            background: var(--primary-color);
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            flex-shrink: 0;
+        }
+
+        .step-item.completed .step-number {
+            background: var(--success-color);
+        }
+
+        .step-item.failed .step-number {
+            background: var(--danger-color);
+        }
+
+        .step-info {
+            flex: 1;
+        }
+
+        .step-name {
+            font-weight: 500;
+            margin-bottom: 5px;
+        }
+
+        .step-details {
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .step-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .risk-badge {
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .risk-badge.low {
+            background: rgba(82, 196, 26, 0.1);
+            color: var(--success-color);
+            border: 1px solid var(--success-color);
+        }
+
+        .risk-badge.medium {
+            background: rgba(250, 173, 20, 0.1);
+            color: var(--warning-color);
+            border: 1px solid var(--warning-color);
+        }
+
+        .risk-badge.high {
+            background: rgba(255, 77, 79, 0.1);
+            color: var(--danger-color);
+            border: 1px solid var(--danger-color);
+        }
+
+        .stats-row {
+            display: flex;
+            gap: 15px;
+            margin-top: 10px;
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .stat-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .close-btn {
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            font-size: 24px;
+            cursor: pointer;
+            padding: 0;
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 4px;
+            transition: all 0.2s;
+        }
+
+        .close-btn:hover {
+            background: var(--bg-light);
+            color: var(--text-primary);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- 侧边栏 -->
+        <div class="sidebar">
+            <div class="sidebar-header">
+                <h2>🏠 AI 控制台</h2>
+                <div style="font-size: 12px; color: var(--text-secondary);">智能体工作台</div>
+            </div>
+            <div class="nav-item active">🤖 智能体中心</div>
+            <div class="nav-item" onclick="window.location.href='index.html'">💬 对话</div>
+            <div class="nav-item" onclick="window.location.href='assistants.html'">🎯 助手</div>
+            <div class="nav-item" onclick="window.location.href='automation.html'">⚡ 自动化</div>
+            <div class="nav-item" onclick="window.location.href='jobs.html'">📊 运行记录</div>
+            <div class="nav-item" onclick="window.location.href='knowledge.html'">📚 知识库</div>
+            <div class="nav-item" onclick="window.location.href='connectors.html'">🔌 连接器</div>
+            <div class="nav-item" onclick="window.location.href='sessions.html'">📖 会话</div>
+            <div class="nav-item" onclick="window.location.href='logs.html'">📋 日志</div>
+            <div class="nav-item" onclick="window.location.href='settings.html'">⚙️ 设置</div>
+        </div>
+
+        <!-- 主内容区 -->
+        <div class="main-content">
+            <div class="header">
+                <div>
+                    <h1>🤖 智能体中心</h1>
+                    <div style="color: var(--text-secondary); margin-top: 5px; font-size: 14px;">
+                        管理可自主执行多步任务的智能体 Agent
+                    </div>
+                </div>
+                <div class="header-actions">
+                    <button class="btn btn-secondary" onclick="showTemplates()">
+                        📑 从模板创建
+                    </button>
+                    <button class="btn btn-primary" onclick="createAgent()">
+                        ➕ 创建智能体
+                    </button>
+                </div>
+            </div>
+
+            <div class="content-area">
+                <!-- 智能体列表 -->
+                <div class="agents-grid" id="agentsGrid">
+                    <!-- Agent 卡片将由 JS 动态生成 -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 创建/编辑智能体模态框 -->
+    <div class="modal" id="agentModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modalTitle">创建智能体</h2>
+                <button class="close-btn" onclick="closeModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="agentForm">
+                    <div class="form-group">
+                        <label>名称 *</label>
+                        <input type="text" id="agentName" placeholder="例如：DevOps 助手" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label>描述</label>
+                        <textarea id="agentDescription" placeholder="描述这个智能体的功能和用途..."></textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label>系统提示词 *</label>
+                        <textarea id="agentPrompt" rows="6" placeholder="你是一个专业的...&#10;你的职责是...&#10;你可以使用以下工具..."></textarea>
+                        <div class="form-help">定义智能体的角色、能力和行为规范</div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>默认模型</label>
+                        <select id="agentModel">
+                            <option value="qwen-max">通义千问 Max</option>
+                            <option value="qwen-plus">通义千问 Plus</option>
+                            <option value="qwen-turbo">通义千问 Turbo</option>
+                            <option value="llama3:70b">Llama 3 70B (本地)</option>
+                            <option value="llama3:8b">Llama 3 8B (本地)</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label>最大执行步数</label>
+                        <input type="number" id="maxSteps" value="10" min="1" max="100">
+                        <div class="form-help">防止智能体陷入无限循环</div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>风险等级</label>
+                        <select id="riskLevel">
+                            <option value="low">低危 - 仅只读操作</option>
+                            <option value="medium">中危 - 可执行脚本和查询</option>
+                            <option value="high">高危 - 可修改文件和系统</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label>可用工具</label>
+                        <div class="tools-selector" id="toolsSelector">
+                            <!-- 工具复选框将由 JS 生成 -->
+                        </div>
+                        <div class="form-help">选择该智能体可以使用的工具</div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>停止条件</label>
+                        <textarea id="stopCondition" rows="3" placeholder='例如：{"max_errors": 3, "timeout_minutes": 30}'></textarea>
+                        <div class="form-help">JSON 格式，定义智能体何时自动停止</div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal()">取消</button>
+                <button class="btn btn-primary" onclick="saveAgent()">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 执行计划模态框 -->
+    <div class="modal" id="planModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>执行计划</h2>
+                <button class="close-btn" onclick="closePlanModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div style="margin-bottom: 20px;">
+                    <div style="font-size: 16px; font-weight: 600; margin-bottom: 10px;">
+                        目标任务
+                    </div>
+                    <div style="padding: 15px; background: var(--bg-darker); border-radius: 6px; border: 1px solid var(--border-color);">
+                        <div id="planGoal">分析系统日志，找出最近的错误并生成报告</div>
+                    </div>
+                </div>
+
+                <div style="margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center;">
+                    <div style="font-size: 16px; font-weight: 600;">执行步骤</div>
+                    <div style="display: flex; gap: 10px;">
+                        <button class="btn btn-sm btn-secondary">⏸ 暂停</button>
+                        <button class="btn btn-sm btn-danger">⏹ 停止</button>
+                    </div>
+                </div>
+
+                <div class="plan-steps" id="planSteps">
+                    <!-- 步骤将由 JS 生成 -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closePlanModal()">关闭</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="assets/common.js"></script>
+    <script>
+        // 示例数据
+        const agents = [
+            {
+                id: 'agent-1',
+                name: 'DevOps 助手',
+                icon: '⚙️',
+                description: '自动执行代码拉取、构建、测试和日志分析任务',
+                model: 'qwen-plus',
+                risk: 'high',
+                enabled: true,
+                tools: ['ShellOps', 'FsOps', 'ProcessOps', 'GitOps', 'NetOps'],
+                maxSteps: 15,
+                stats: {
+                    runs: 24,
+                    success: 22,
+                    lastRun: '2 小时前'
+                }
+            },
+            {
+                id: 'agent-2',
+                name: '知识整理助手',
+                icon: '📚',
+                description: '扫描文档目录，自动分块索引并生成知识库',
+                model: 'qwen-max',
+                risk: 'low',
+                enabled: true,
+                tools: ['FsOps', 'VectorIndexer', 'BailianChat', 'RAG'],
+                maxSteps: 10,
+                stats: {
+                    runs: 15,
+                    success: 15,
+                    lastRun: '昨天'
+                }
+            },
+            {
+                id: 'agent-3',
+                name: '系统巡检助手',
+                icon: '🔍',
+                description: '定时检查系统资源状态并生成监控报告',
+                model: 'qwen-turbo',
+                risk: 'medium',
+                enabled: true,
+                tools: ['ProcessOps', 'NetOps', 'FsOps', 'ShellOps'],
+                maxSteps: 8,
+                stats: {
+                    runs: 48,
+                    success: 46,
+                    lastRun: '30 分钟前'
+                }
+            },
+            {
+                id: 'agent-4',
+                name: '代码审查助手',
+                icon: '🔎',
+                description: '自动分析代码变更，生成审查报告和改进建议',
+                model: 'qwen-max',
+                risk: 'low',
+                enabled: false,
+                tools: ['GitOps', 'FsOps'],
+                maxSteps: 12,
+                stats: {
+                    runs: 0,
+                    success: 0,
+                    lastRun: '从未运行'
+                }
+            },
+            {
+                id: 'agent-5',
+                name: '数据同步助手',
+                icon: '🔄',
+                description: '在不同系统间自动同步数据和文件',
+                model: 'llama3:8b',
+                risk: 'high',
+                enabled: true,
+                tools: ['FsOps', 'NetOps', 'HttpConnector', 'DatabaseConnector'],
+                maxSteps: 20,
+                stats: {
+                    runs: 36,
+                    success: 34,
+                    lastRun: '1 小时前'
+                }
+            },
+            {
+                id: 'agent-6',
+                name: '文档生成助手',
+                icon: '📝',
+                description: '根据代码和注释自动生成技术文档',
+                model: 'qwen-plus',
+                risk: 'low',
+                enabled: true,
+                tools: ['FsOps', 'GitOps'],
+                maxSteps: 8,
+                stats: {
+                    runs: 12,
+                    success: 11,
+                    lastRun: '3 天前'
+                }
+            }
+        ];
+
+        const availableTools = [
+            'FsOps', 'ShellOps', 'ProcessOps', 'NetOps', 'ClipboardOps', 'UIAutoOps',
+            'GitOps', 'VectorIndexer', 'BailianChat', 'RAG',
+            'HttpConnector', 'EmailConnector', 'DatabaseConnector'
+        ];
+
+        // 渲染智能体列表
+        function renderAgents() {
+            const grid = document.getElementById('agentsGrid');
+            grid.innerHTML = agents.map(agent => `
+                <div class="agent-card">
+                    <div class="toggle-switch ${agent.enabled ? 'active' : ''}"
+                         onclick="toggleAgent('${agent.id}')"
+                         title="${agent.enabled ? '已启用' : '已禁用'}">
+                    </div>
+
+                    <div class="agent-card-header">
+                        <div class="agent-icon">${agent.icon}</div>
+                        <div class="agent-info">
+                            <h3 class="agent-name">${agent.name}</h3>
+                        </div>
+                    </div>
+
+                    <div class="agent-description">${agent.description}</div>
+
+                    <div class="agent-meta">
+                        <span class="meta-item">
+                            <span>🤖</span> ${agent.model}
+                        </span>
+                        <span class="meta-item">
+                            <span>📊</span> 最多 ${agent.maxSteps} 步
+                        </span>
+                        <span class="risk-badge ${agent.risk}">
+                            ${agent.risk === 'low' ? '低危' : agent.risk === 'medium' ? '中危' : '高危'}
+                        </span>
+                    </div>
+
+                    <div class="agent-tools">
+                        <div class="tools-label">可用工具 (${agent.tools.length})</div>
+                        <div class="tools-list">
+                            ${agent.tools.map(tool => `<span class="tool-tag">${tool}</span>`).join('')}
+                        </div>
+                    </div>
+
+                    <div class="stats-row">
+                        <div class="stat-item">
+                            <span>▶️</span> 运行 ${agent.stats.runs} 次
+                        </div>
+                        <div class="stat-item">
+                            <span>✅</span> 成功 ${agent.stats.success} 次
+                        </div>
+                        <div class="stat-item">
+                            <span>🕐</span> ${agent.stats.lastRun}
+                        </div>
+                    </div>
+
+                    <div class="agent-actions">
+                        <button class="btn btn-sm btn-primary" onclick="runAgent('${agent.id}')"
+                                ${!agent.enabled ? 'disabled' : ''}>
+                            ▶️ 运行
+                        </button>
+                        <button class="btn btn-sm btn-secondary" onclick="editAgent('${agent.id}')">
+                            ✏️ 编辑
+                        </button>
+                        <button class="btn btn-sm btn-secondary" onclick="viewHistory('${agent.id}')">
+                            📊 历史
+                        </button>
+                        <button class="btn btn-sm btn-danger" onclick="deleteAgent('${agent.id}')">
+                            🗑️
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // 渲染工具选择器
+        function renderToolsSelector() {
+            const selector = document.getElementById('toolsSelector');
+            selector.innerHTML = availableTools.map(tool => `
+                <label class="tool-checkbox">
+                    <input type="checkbox" value="${tool}">
+                    <span>${tool}</span>
+                </label>
+            `).join('');
+        }
+
+        // 创建智能体
+        function createAgent() {
+            document.getElementById('modalTitle').textContent = '创建智能体';
+            document.getElementById('agentForm').reset();
+            renderToolsSelector();
+            document.getElementById('agentModal').classList.add('show');
+        }
+
+        // 编辑智能体
+        function editAgent(id) {
+            const agent = agents.find(a => a.id === id);
+            if (!agent) return;
+
+            document.getElementById('modalTitle').textContent = '编辑智能体';
+            document.getElementById('agentName').value = agent.name;
+            document.getElementById('agentDescription').value = agent.description;
+            document.getElementById('agentModel').value = agent.model;
+            document.getElementById('maxSteps').value = agent.maxSteps;
+            document.getElementById('riskLevel').value = agent.risk;
+
+            renderToolsSelector();
+            // 选中已有工具
+            agent.tools.forEach(tool => {
+                const checkbox = document.querySelector(`input[value="${tool}"]`);
+                if (checkbox) checkbox.checked = true;
+            });
+
+            document.getElementById('agentModal').classList.add('show');
+        }
+
+        // 运行智能体
+        function runAgent(id) {
+            const agent = agents.find(a => a.id === id);
+            if (!agent) return;
+
+            // 弹出执行计划界面
+            showPlanExecution(agent);
+        }
+
+        // 显示执行计划
+        function showPlanExecution(agent) {
+            const steps = [
+                { number: 1, name: '分析任务需求', type: 'LLM调用', status: 'completed', duration: '1.2s' },
+                { number: 2, name: '读取日志文件', type: 'FsOps', status: 'completed', duration: '0.5s' },
+                { number: 3, name: '解析日志内容', type: 'LLM调用', status: 'completed', duration: '2.1s' },
+                { number: 4, name: '提取错误信息', type: 'ShellOps', status: 'completed', duration: '0.8s' },
+                { number: 5, name: '生成分析报告', type: 'LLM调用', status: 'running', duration: '-' },
+                { number: 6, name: '保存报告文件', type: 'FsOps', status: 'pending', duration: '-' }
+            ];
+
+            const stepsHtml = steps.map(step => `
+                <div class="step-item ${step.status}">
+                    <div class="step-number">${step.number}</div>
+                    <div class="step-info">
+                        <div class="step-name">${step.name}</div>
+                        <div class="step-details">
+                            类型: ${step.type} | 耗时: ${step.duration}
+                            ${step.status === 'running' ? '<span style="color: var(--primary-color)">● 执行中...</span>' : ''}
+                        </div>
+                    </div>
+                    <div class="step-actions">
+                        ${step.status === 'pending' ? '<button class="btn btn-sm btn-secondary">⏭ 跳过</button>' : ''}
+                        ${step.status === 'completed' || step.status === 'failed' ? '<button class="btn btn-sm btn-secondary">🔄 重跑</button>' : ''}
+                    </div>
+                </div>
+            `).join('');
+
+            document.getElementById('planSteps').innerHTML = stepsHtml;
+            document.getElementById('planModal').classList.add('show');
+        }
+
+        // 切换智能体启用状态
+        function toggleAgent(id) {
+            const agent = agents.find(a => a.id === id);
+            if (agent) {
+                agent.enabled = !agent.enabled;
+                renderAgents();
+                Utils.showToast(agent.enabled ? '智能体已启用' : '智能体已禁用', 'success');
+            }
+        }
+
+        // 删除智能体
+        function deleteAgent(id) {
+            if (confirm('确定要删除这个智能体吗?')) {
+                const index = agents.findIndex(a => a.id === id);
+                if (index !== -1) {
+                    agents.splice(index, 1);
+                    renderAgents();
+                    Utils.showToast('智能体已删除', 'success');
+                }
+            }
+        }
+
+        // 查看历史
+        function viewHistory(id) {
+            Utils.showToast('跳转到运行记录页面...', 'info');
+            setTimeout(() => {
+                window.location.href = 'jobs.html?agent=' + id;
+            }, 500);
+        }
+
+        // 保存智能体
+        function saveAgent() {
+            const name = document.getElementById('agentName').value;
+            if (!name) {
+                Utils.showToast('请输入智能体名称', 'warning');
+                return;
+            }
+
+            const selectedTools = Array.from(document.querySelectorAll('#toolsSelector input:checked'))
+                .map(cb => cb.value);
+
+            Utils.showToast('智能体已保存', 'success');
+            closeModal();
+        }
+
+        // 关闭模态框
+        function closeModal() {
+            document.getElementById('agentModal').classList.remove('show');
+        }
+
+        function closePlanModal() {
+            document.getElementById('planModal').classList.remove('show');
+        }
+
+        // 显示模板
+        function showTemplates() {
+            Utils.showToast('模板功能开发中...', 'info');
+        }
+
+        // 初始化
+        renderAgents();
+    </script>
+</body>
+</html>

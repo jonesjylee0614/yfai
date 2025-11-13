@@ -342,6 +342,37 @@
             </div>
         </div>
 
+        <!-- 审批选项 -->
+        <div class="info-section" id="approvalOptions" style="display: none;">
+            <div class="info-section-title">
+                <span>🔐</span>
+                <span>权限授予方式</span>
+            </div>
+            <div class="checklist">
+                <label class="checklist-item" style="padding: 12px; border: 1px solid var(--border-color); border-radius: 6px; margin-bottom: 8px; cursor: pointer;">
+                    <input type="radio" name="approvalType" value="once" checked style="margin-right: 8px;">
+                    <div style="flex: 1;">
+                        <div style="font-weight: 600; margin-bottom: 4px;">仅此一次</div>
+                        <div style="font-size: 12px; color: var(--text-secondary);">只允许执行当前这一次操作</div>
+                    </div>
+                </label>
+                <label class="checklist-item" style="padding: 12px; border: 1px solid var(--border-color); border-radius: 6px; margin-bottom: 8px; cursor: pointer;">
+                    <input type="radio" name="approvalType" value="agent" style="margin-right: 8px;">
+                    <div style="flex: 1;">
+                        <div style="font-weight: 600; margin-bottom: 4px;">对该智能体永久允许</div>
+                        <div style="font-size: 12px; color: var(--text-secondary);">允许 <strong id="agentName">DevOps 助手</strong> 使用此工具,无需再次审批</div>
+                    </div>
+                </label>
+                <label class="checklist-item" style="padding: 12px; border: 1px solid var(--border-color); border-radius: 6px; cursor: pointer;">
+                    <input type="radio" name="approvalType" value="global" style="margin-right: 8px;">
+                    <div style="flex: 1;">
+                        <div style="font-weight: 600; margin-bottom: 4px;">全局永久允许</div>
+                        <div style="font-size: 12px; color: var(--text-secondary);">允许所有智能体使用此工具(不推荐用于高危操作)</div>
+                    </div>
+                </label>
+            </div>
+        </div>
+
         <!-- 操作按钮 -->
         <div class="actions">
             <button class="btn btn-danger" onclick="handleReject()">
@@ -402,27 +433,36 @@
             const check2 = document.getElementById('check2').checked;
             const check3 = document.getElementById('check3').checked;
             const approveBtn = document.getElementById('approveBtn');
-            
+            const approvalOptions = document.getElementById('approvalOptions');
+
             if (check1 && check2 && check3) {
                 approveBtn.disabled = false;
+                approvalOptions.style.display = 'block';
             } else {
                 approveBtn.disabled = true;
+                approvalOptions.style.display = 'none';
             }
         }
 
         // 批准操作
         function handleApprove() {
             clearInterval(timerInterval);
-            
+
+            const approvalType = document.querySelector('input[name="approvalType"]:checked').value;
+            const agentName = document.getElementById('agentName').textContent;
+
             const result = {
                 action: 'approve',
+                approvalType: approvalType,
                 timestamp: new Date().toISOString(),
-                command: document.getElementById('commandPreview').textContent
+                command: document.getElementById('commandPreview').textContent,
+                agent: agentName,
+                approvedBy: 'User', // 实际应用中应该获取当前用户信息
             };
-            
+
             // 显示确认信息
-            showResultScreen('approved');
-            
+            showResultScreen('approved', approvalType);
+
             // 3秒后关闭窗口
             setTimeout(() => {
                 if (window.opener) {
@@ -455,18 +495,33 @@
         }
 
         // 显示结果屏幕
-        function showResultScreen(type, auto = false) {
+        function showResultScreen(type, autoOrApprovalType = false) {
             const container = document.querySelector('.approval-container');
-            
+
             if (type === 'approved') {
+                const approvalType = autoOrApprovalType;
+                let approvalMessage = '';
+                if (approvalType === 'once') {
+                    approvalMessage = '仅此一次允许';
+                } else if (approvalType === 'agent') {
+                    approvalMessage = '已对该智能体永久授权';
+                } else if (approvalType === 'global') {
+                    approvalMessage = '已全局永久授权';
+                }
+
                 container.innerHTML = `
                     <div style="text-align: center; padding: 60px 20px;">
                         <div style="font-size: 64px; margin-bottom: 20px;">✅</div>
                         <div style="font-size: 24px; font-weight: 600; margin-bottom: 12px;">
                             操作已批准
                         </div>
-                        <div style="color: var(--text-secondary);">
+                        <div style="color: var(--text-secondary); margin-bottom: 8px;">
                             正在执行命令...
+                        </div>
+                        <div style="padding: 10px 20px; background: var(--bg-light); border-radius: 6px; display: inline-block; margin-bottom: 20px;">
+                            <div style="font-size: 13px; color: var(--success-color);">
+                                🔐 ${approvalMessage}
+                            </div>
                         </div>
                         <div style="margin-top: 20px;">
                             <div class="loading"></div>
@@ -474,6 +529,7 @@
                     </div>
                 `;
             } else {
+                const auto = autoOrApprovalType;
                 container.innerHTML = `
                     <div style="text-align: center; padding: 60px 20px;">
                         <div style="font-size: 64px; margin-bottom: 20px;">❌</div>

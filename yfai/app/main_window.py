@@ -13,6 +13,7 @@ from PyQt6.QtWidgets import (
     QLabel,
     QComboBox,
     QStatusBar,
+    QStackedWidget,
 )
 from PyQt6.QtCore import Qt, pyqtSignal, QObject
 from PyQt6.QtGui import QAction
@@ -21,6 +22,17 @@ from .widgets.chat_widget import ChatWidget
 from .widgets.sidebar import SidebarWidget
 from .widgets.tools_panel import ToolsPanel
 from .widgets.settings_dialog import SettingsDialog
+from .widgets.agents_page import AgentsPage
+from .widgets.jobs_page import JobsPage
+from .widgets.automation_page import AutomationPage
+from .widgets.connector_page import ConnectorPage
+from .widgets.knowledge_page import KnowledgeBasePage
+from .widgets.sessions_page import SessionsPage
+from .widgets.assistants_page import AssistantsPage
+from .widgets.logs_page import LogsPage
+from .widgets.approval_dialog import ApprovalDialog
+
+from yfai.security.guard import ApprovalRequest, ApprovalResult, ApprovalStatus
 
 
 class MainWindow(QMainWindow):
@@ -34,6 +46,7 @@ class MainWindow(QMainWindow):
         self._init_ui()
         self._connect_signals()
         self._load_settings()
+        self._setup_approval_callback()
 
     def _init_ui(self) -> None:
         """初始化UI"""
@@ -61,9 +74,47 @@ class MainWindow(QMainWindow):
         self.sidebar = SidebarWidget(self.orchestrator)
         splitter.addWidget(self.sidebar)
 
-        # 中间对话区域
+        # 中间页面堆栈
+        self.page_stack = QStackedWidget()
+
+        # 初始化所有页面
         self.chat_widget = ChatWidget(self.orchestrator)
-        splitter.addWidget(self.chat_widget)
+        self.agents_page = AgentsPage(self.orchestrator)
+        self.jobs_page = JobsPage(self.orchestrator)
+        self.automation_page = AutomationPage(self.orchestrator)
+        self.connectors_page = ConnectorPage(self.orchestrator)
+        self.knowledge_page = KnowledgeBasePage(self.orchestrator)
+        self.sessions_page = SessionsPage(self.orchestrator)
+        self.assistants_page = AssistantsPage(self.orchestrator)
+        self.logs_page = LogsPage(self.orchestrator)
+
+        # 创建占位页面（待实现的功能）
+        self.tools_page = self._create_placeholder_page("工具管理")
+        self.settings_page = self._create_placeholder_page("系统设置")
+
+        # 页面映射表
+        self.pages = {
+            "chat": self.chat_widget,
+            "agents": self.agents_page,
+            "jobs": self.jobs_page,
+            "automation": self.automation_page,
+            "connectors": self.connectors_page,
+            "knowledge": self.knowledge_page,
+            "sessions": self.sessions_page,
+            "assistants": self.assistants_page,
+            "logs": self.logs_page,
+            "tools": self.tools_page,
+            "settings": self.settings_page,
+        }
+
+        # 添加所有页面到堆栈
+        for page in self.pages.values():
+            self.page_stack.addWidget(page)
+
+        # 默认显示聊天页面
+        self.page_stack.setCurrentWidget(self.chat_widget)
+
+        splitter.addWidget(self.page_stack)
 
         # 右侧工具面板(可折叠)
         self.tools_panel = ToolsPanel(self.orchestrator)
@@ -72,7 +123,7 @@ class MainWindow(QMainWindow):
 
         # 设置分割器比例
         splitter.setStretchFactor(0, 1)  # 侧边栏
-        splitter.setStretchFactor(1, 4)  # 对话区
+        splitter.setStretchFactor(1, 4)  # 页面堆栈
         splitter.setStretchFactor(2, 1)  # 工具面板
 
         main_layout.addWidget(splitter)
@@ -210,9 +261,41 @@ class MainWindow(QMainWindow):
 
         self.statusBar.showMessage(f"已切换到: {text}")
 
+    def _create_placeholder_page(self, title: str) -> QWidget:
+        """创建占位页面"""
+        widget = QWidget()
+        layout = QVBoxLayout(widget)
+
+        label = QLabel(f"📋 {title}\n\n该功能正在开发中...")
+        label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        label.setStyleSheet("font-size: 16pt; color: #666;")
+
+        layout.addWidget(label)
+        return widget
+
     def _on_page_changed(self, page: str) -> None:
         """页面改变"""
-        self.statusBar.showMessage(f"切换到: {page}")
+        if page in self.pages:
+            self.page_stack.setCurrentWidget(self.pages[page])
+
+            # 更新状态栏
+            page_names = {
+                "chat": "对话",
+                "agents": "智能体",
+                "jobs": "运行记录",
+                "automation": "自动化管理",
+                "connectors": "连接器管理",
+                "knowledge": "知识库",
+                "sessions": "会话管理",
+                "assistants": "助手管理",
+                "logs": "日志查看",
+                "tools": "工具管理",
+                "settings": "系统设置",
+            }
+            page_name = page_names.get(page, page)
+            self.statusBar.showMessage(f"当前页面: {page_name}")
+        else:
+            self.statusBar.showMessage(f"⚠️ 页面 '{page}' 不存在")
 
     def _run_health_check(self) -> None:
         """运行健康检查"""
@@ -230,4 +313,42 @@ class MainWindow(QMainWindow):
             self.statusBar.showMessage(" | ".join(status_text))
 
         asyncio.create_task(check())
+
+    def _setup_approval_callback(self) -> None:
+        """设置审批回调函数"""
+        def approval_callback(request: ApprovalRequest) -> ApprovalResult:
+            """审批回调函数
+
+            在主线程中显示审批对话框，并返回用户的审批决策
+            """
+            # 显示审批对话框
+            dialog = ApprovalDialog(request, self)
+            result_code = dialog.exec()
+
+            # 处理结果
+            if result_code == ApprovalDialog.APPROVED_ONCE:
+                return ApprovalResult(
+                    request_id=request.id,
+                    status=ApprovalStatus.APPROVED,
+                    approved_by="user",
+                    reason="仅此一次允许",
+                )
+            elif result_code == ApprovalDialog.APPROVED_ALWAYS:
+                # TODO: 保存到白名单/永久允许规则
+                return ApprovalResult(
+                    request_id=request.id,
+                    status=ApprovalStatus.APPROVED,
+                    approved_by="user",
+                    reason="永久允许",
+                )
+            else:
+                return ApprovalResult(
+                    request_id=request.id,
+                    status=ApprovalStatus.REJECTED,
+                    approved_by="user",
+                    reason="用户拒绝执行",
+                )
+
+        # 设置回调函数到 security_guard
+        self.orchestrator.security_guard.set_approval_callback(approval_callback)
 

@@ -10,7 +10,7 @@ from typing import Any, AsyncIterator, Dict, List, Optional
 from ..providers import ChatMessage, ChatResponse, ProviderManager
 from ..mcp import McpClient, McpRegistry
 from ..localops import FileSystemOps, ShellOps, ProcessOps, NetworkOps
-from ..security import SecurityGuard, ApprovalRequest, ApprovalResult, RiskLevel
+from ..security import SecurityGuard, SecurityPolicy, ApprovalRequest, ApprovalResult, RiskLevel
 from ..store import DatabaseManager, Session, Message, ToolCall
 from .agent_runner import AgentRunner
 
@@ -25,6 +25,7 @@ class Orchestrator:
         self.provider_manager = ProviderManager(config)
         self.mcp_registry = McpRegistry()
         self.security_guard = SecurityGuard(config)
+        self.security_policy = SecurityPolicy(config)
 
         # 初始化数据库
         db_path = config.get("database", {}).get("path", "data/yfai.db")
@@ -46,6 +47,7 @@ class Orchestrator:
             db_manager=self.db_manager,
             provider_manager=self.provider_manager,
             security_guard=self.security_guard,
+            security_policy=self.security_policy,
             tool_executor=self._execute_tool_internal,
         )
 

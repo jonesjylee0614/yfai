@@ -1,5 +1,6 @@
 """知识库管理页面"""
 
+import json
 import uuid
 from datetime import datetime
 from typing import Optional
@@ -18,9 +19,10 @@ from PyQt6.QtWidgets import (
     QLineEdit,
     QTextEdit,
     QDialogButtonBox,
+    QComboBox,
+    QSpinBox,
 )
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QColor
 
 
 class KnowledgeBaseDialog(QDialog):
@@ -58,15 +60,40 @@ class KnowledgeBaseDialog(QDialog):
         self.description_edit.setMaximumHeight(100)
         form_layout.addRow("描述:", self.description_edit)
 
+        # 数据源类型
+        self.source_type_combo = QComboBox()
+        self.source_type_combo.addItems(["documents", "directory", "web", "database"])
+        self.source_type_combo.currentTextChanged.connect(self._on_source_type_changed)
+        form_layout.addRow("数据源类型:", self.source_type_combo)
+
+        # 数据源路径/地址
+        self.source_location_edit = QLineEdit()
+        self.source_location_edit.setPlaceholderText("例如: ./docs 或 https://example.com")
+        form_layout.addRow("路径/地址:", self.source_location_edit)
+
+        # 高级配置
+        self.config_edit = QTextEdit()
+        self.config_edit.setPlaceholderText('{"include": ["*.md"]}')
+        self.config_edit.setMaximumHeight(80)
+        form_layout.addRow("额外配置(JSON):", self.config_edit)
+
         # 嵌入模型
         self.embedding_model_edit = QLineEdit()
         self.embedding_model_edit.setPlaceholderText("text-embedding-v1")
         form_layout.addRow("嵌入模型:", self.embedding_model_edit)
 
-        # 向量维度
-        self.dimension_edit = QLineEdit()
-        self.dimension_edit.setPlaceholderText("1536")
-        form_layout.addRow("向量维度:", self.dimension_edit)
+        # 分块策略
+        self.chunk_size_spin = QSpinBox()
+        self.chunk_size_spin.setRange(100, 4000)
+        self.chunk_size_spin.setValue(500)
+        self.chunk_size_spin.setSuffix(" 字符")
+        form_layout.addRow("分块大小:", self.chunk_size_spin)
+
+        self.chunk_overlap_spin = QSpinBox()
+        self.chunk_overlap_spin.setRange(0, 1000)
+        self.chunk_overlap_spin.setValue(50)
+        self.chunk_overlap_spin.setSuffix(" 字符")
+        form_layout.addRow("块重叠:", self.chunk_overlap_spin)
 
         layout.addLayout(form_layout)
 
@@ -81,6 +108,16 @@ class KnowledgeBaseDialog(QDialog):
         layout.addWidget(buttons)
         self.setLayout(layout)
 
+    def _on_source_type_changed(self, source_type: str):
+        """根据类型调整占位提示"""
+        placeholders = {
+            "documents": "例如: ./docs/guide.md 或 data/*.md",
+            "directory": "例如: ./workspace/project",
+            "web": "例如: https://example.com/docs",
+            "database": "例如: sqlite:///data.db",
+        }
+        self.source_location_edit.setPlaceholderText(placeholders.get(source_type, ""))
+
     def _load_kb_data(self):
         """加载知识库数据"""
         if not self.kb:
@@ -88,16 +125,60 @@ class KnowledgeBaseDialog(QDialog):
 
         self.name_edit.setText(self.kb.get("name", ""))
         self.description_edit.setPlainText(self.kb.get("description", ""))
-        self.embedding_model_edit.setText(self.kb.get("embedding_model", ""))
-        self.dimension_edit.setText(str(self.kb.get("dimension", "")))
+        self.embedding_model_edit.setText(self.kb.get("embedding_model", "text-embedding-v1"))
+        self.source_type_combo.setCurrentText(self.kb.get("source_type", "documents"))
+
+        config = self.kb.get("source_config") or {}
+        if isinstance(config, str):
+            try:
+                config = json.loads(config)
+            except json.JSONDecodeError:
+                config = {}
+        # 提取常用路径字段
+        location = (
+            config.get("path")
+            or config.get("directory")
+            or config.get("url")
+            or config.get("connection")
+            or ""
+        )
+        self.source_location_edit.setText(location)
+        if config:
+            self.config_edit.setPlainText(json.dumps(config, indent=2, ensure_ascii=False))
+
+        self.chunk_size_spin.setValue(self.kb.get("chunk_size", 500) or 500)
+        self.chunk_overlap_spin.setValue(self.kb.get("chunk_overlap", 50) or 50)
 
     def get_kb_data(self) -> dict:
         """获取知识库数据"""
+        source_type = self.source_type_combo.currentText()
+        location = self.source_location_edit.text().strip()
+
+        config = {}
+        if location:
+            if source_type in ("documents", "directory"):
+                config["path"] = location
+            elif source_type == "web":
+                config["url"] = location
+            elif source_type == "database":
+                config["connection"] = location
+
+        extra = self.config_edit.toPlainText().strip()
+        if extra:
+            try:
+                extra_config = json.loads(extra)
+                config.update(extra_config)
+            except json.JSONDecodeError:
+                pass
+
         return {
             "name": self.name_edit.text(),
             "description": self.description_edit.toPlainText(),
-            "embedding_model": self.embedding_model_edit.text(),
-            "dimension": int(self.dimension_edit.text() or "1536"),
+            "source_type": source_type,
+            "source_config": json.dumps(config, ensure_ascii=False),
+            "embedding_model": self.embedding_model_edit.text() or "text-embedding-v1",
+            "chunk_size": self.chunk_size_spin.value(),
+            "chunk_overlap": self.chunk_overlap_spin.value(),
         }
 
 
@@ -131,9 +212,9 @@ class KnowledgeBasePage(QWidget):
 
         # 知识库列表
         self.table = QTableWidget()
-        self.table.setColumnCount(6)
+        self.table.setColumnCount(7)
         self.table.setHorizontalHeaderLabels([
-            "名称", "文档数", "向量维度", "最后更新", "操作", "ID"
+            "名称", "数据源", "文档数", "嵌入模型", "最后索引", "操作", "ID"
         ])
 
         # 设置列宽
@@ -143,7 +224,9 @@ class KnowledgeBasePage(QWidget):
         header.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
         header.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
         header.setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)
-        self.table.setColumnHidden(5, True)  # 隐藏ID列
+        header.setSectionResizeMode(5, QHeaderView.ResizeMode.ResizeToContents)
+        self.table.setColumnHidden(6, True)  # 隐藏ID列
+        self.table.setAlternatingRowColors(True)
 
         layout.addWidget(self.table)
         self.setLayout(layout)
@@ -161,22 +244,26 @@ class KnowledgeBasePage(QWidget):
                     # 名称
                     self.table.setItem(row, 0, QTableWidgetItem(kb.name))
 
+                    # 数据源类型
+                    self.table.setItem(row, 1, QTableWidgetItem(kb.source_type))
+
                     # 文档数
-                    self.table.setItem(row, 1, QTableWidgetItem(str(kb.document_count)))
+                    chunk_count = kb.chunk_count or 0
+                    self.table.setItem(row, 2, QTableWidgetItem(str(chunk_count)))
 
-                    # 向量维度
-                    self.table.setItem(row, 2, QTableWidgetItem(str(kb.dimension)))
+                    # 嵌入模型
+                    self.table.setItem(row, 3, QTableWidgetItem(kb.embedding_model or "-"))
 
-                    # 最后更新
-                    last_update = kb.last_indexed_at.strftime("%Y-%m-%d %H:%M") if kb.last_indexed_at else "-"
-                    self.table.setItem(row, 3, QTableWidgetItem(last_update))
+                    # 最后索引时间
+                    last_indexed = kb.indexed_at.strftime("%Y-%m-%d %H:%M") if kb.indexed_at else "-"
+                    self.table.setItem(row, 4, QTableWidgetItem(last_indexed))
 
                     # 操作按钮
                     actions_widget = self._create_action_buttons(kb.id)
-                    self.table.setCellWidget(row, 4, actions_widget)
+                    self.table.setCellWidget(row, 5, actions_widget)
 
                     # ID (隐藏)
-                    self.table.setItem(row, 5, QTableWidgetItem(kb.id))
+                    self.table.setItem(row, 6, QTableWidgetItem(kb.id))
 
         except Exception as e:
             QMessageBox.critical(self, "错误", f"加载知识库列表失败: {e}")

@@ -101,8 +101,8 @@ class AssistantDialog(QDialog):
         self.name_edit.setText(self.assistant.get("name", ""))
         self.description_edit.setPlainText(self.assistant.get("description", ""))
         self.system_prompt_edit.setPlainText(self.assistant.get("system_prompt", ""))
-        self.provider_combo.setCurrentText(self.assistant.get("default_provider", "bailian"))
-        self.model_edit.setText(self.assistant.get("default_model", ""))
+        self.provider_combo.setCurrentText(self.assistant.get("provider", "bailian"))
+        self.model_edit.setText(self.assistant.get("model", ""))
         self.builtin_check.setChecked(self.assistant.get("is_builtin", False))
 
     def get_assistant_data(self) -> dict:
@@ -111,8 +111,8 @@ class AssistantDialog(QDialog):
             "name": self.name_edit.text(),
             "description": self.description_edit.toPlainText(),
             "system_prompt": self.system_prompt_edit.toPlainText(),
-            "default_provider": self.provider_combo.currentText(),
-            "default_model": self.model_edit.text(),
+            "provider": self.provider_combo.currentText(),
+            "model": self.model_edit.text(),
             "is_builtin": self.builtin_check.isChecked(),
         }
 
@@ -160,6 +160,7 @@ class AssistantsPage(QWidget):
         header.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
         header.setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)
         self.table.setColumnHidden(5, True)  # 隐藏ID列
+        self.table.setAlternatingRowColors(True)
 
         layout.addWidget(self.table)
         self.setLayout(layout)
@@ -178,7 +179,9 @@ class AssistantsPage(QWidget):
                     self.table.setItem(row, 0, QTableWidgetItem(assistant.name))
 
                     # Provider/模型
-                    provider_model = f"{assistant.default_provider}/{assistant.default_model}"
+                    provider = assistant.provider or "-"
+                    model = assistant.model or "-"
+                    provider_model = f"{provider}/{model}"
                     self.table.setItem(row, 1, QTableWidgetItem(provider_model))
 
                     # 内置

@@ -10,7 +10,8 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional, Callable
 
 from yfai.providers.manager import ProviderManager
-from yfai.security.guard import SecurityGuard
+from yfai.security.guard import SecurityGuard, ApprovalRequest, ApprovalStatus, RiskLevel
+from yfai.security.policy import SecurityPolicy
 from yfai.store.db import DatabaseManager, Agent, JobRun, JobStep
 
 
@@ -29,6 +30,7 @@ class AgentRunner:
         db_manager: DatabaseManager,
         provider_manager: ProviderManager,
         security_guard: SecurityGuard,
+        security_policy: SecurityPolicy,
         tool_executor: Optional[Callable] = None,
     ):
         """初始化 AgentRunner
@@ -37,11 +39,13 @@ class AgentRunner:
             db_manager: 数据库管理器
             provider_manager: Provider 管理器
             security_guard: 安全守卫
+            security_policy: 安全策略
             tool_executor: 工具执行器(可选)
         """
         self.db = db_manager
         self.provider_manager = provider_manager
         self.security_guard = security_guard
+        self.security_policy = security_policy
         self.tool_executor = tool_executor
 
     async def run_agent(
@@ -355,15 +359,98 @@ class AgentRunner:
         if tool_name not in agent["allowed_tools"]:
             return {"error": f"Tool not allowed: {tool_name}"}
 
-        # 安全检查(这里简化处理,实际应该调用 SecurityGuard)
-        # TODO: 集成 SecurityGuard 进行权限检查
+        # 安全检查：评估风险等级
+        risk_level_str = self.security_policy.get_operation_risk_level(tool_name)
+        try:
+            risk_level = RiskLevel(risk_level_str)
+        except ValueError:
+            risk_level = RiskLevel.MEDIUM
+
+        # 检查是否需要审批
+        needs_approval = self.security_guard._needs_approval(risk_level)
+
+        approval_result = None
+        if needs_approval:
+            # 构建审批请求
+            description = step.get("description", f"执行工具: {tool_name}")
+            impact = self._assess_tool_impact(tool_name, params)
+
+            approval_request = ApprovalRequest(
+                tool_name=tool_name,
+                tool_type="local_ops",  # 可以根据实际情况调整
+                params=params,
+                risk_level=risk_level,
+                source=f"agent:{agent['name']}",
+                description=description,
+                impact=impact,
+            )
+
+            # 请求审批
+            approval_result = await self.security_guard.request_approval(approval_request)
+
+            # 检查审批结果
+            if approval_result.status == ApprovalStatus.REJECTED:
+                return {
+                    "error": f"操作被拒绝: {approval_result.reason or '用户拒绝执行'}",
+                    "approval_status": "rejected",
+                }
+            elif approval_result.status == ApprovalStatus.TIMEOUT:
+                return {
+                    "error": "审批超时",
+                    "approval_status": "timeout",
+                }
 
         # 执行工具
         if self.tool_executor:
             result = await self.tool_executor(tool_name, params)
+            # 添加审批信息到结果中
+            if approval_result:
+                result["approval_status"] = approval_result.status.value
+                result["approved_by"] = approval_result.approved_by
             return result
         else:
-            return {"message": f"Tool executed: {tool_name}", "params": params}
+            return {
+                "message": f"Tool executed: {tool_name}",
+                "params": params,
+                "approval_status": approval_result.status.value if approval_result else "auto_approved",
+            }
+
+    def _assess_tool_impact(self, tool_name: str, params: Dict[str, Any]) -> str:
+        """评估工具执行的影响
+
+        Args:
+            tool_name: 工具名称
+            params: 参数
+
+        Returns:
+            影响描述
+        """
+        impacts = []
+
+        # 文件系统操作
+        if "delete" in tool_name or "remove" in tool_name:
+            if "path" in params:
+                impacts.append(f"将删除文件/目录: {params['path']}")
+        elif "write" in tool_name or "create" in tool_name:
+            if "path" in params:
+                impacts.append(f"将写入文件: {params['path']}")
+
+        # Shell 操作
+        if "shell" in tool_name or "exec" in tool_name or "run" in tool_name:
+            if "command" in params:
+                impacts.append(f"将执行命令: {params['command']}")
+
+        # 进程操作
+        if "kill" in tool_name or "terminate" in tool_name:
+            if "pid" in params:
+                impacts.append(f"将终止进程: PID {params['pid']}")
+
+        # 网络操作
+        if "http" in tool_name or "request" in tool_name:
+            if "url" in params:
+                impacts.append(f"将访问URL: {params['url']}")
+
+        return " | ".join(impacts) if impacts else f"执行工具 {tool_name}"
 
     async def _execute_model_step(
         self,

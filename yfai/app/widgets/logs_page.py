@@ -1,5 +1,10 @@
 """日志查看页面"""
 
+import csv
+import json
+from datetime import datetime
+from pathlib import Path
+
 from PyQt6.QtWidgets import (
     QWidget,
     QVBoxLayout,
@@ -11,6 +16,8 @@ from PyQt6.QtWidgets import (
     QComboBox,
     QLabel,
     QMessageBox,
+    QSpinBox,
+    QFileDialog,
 )
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor
@@ -22,6 +29,10 @@ class LogsPage(QWidget):
     def __init__(self, orchestrator, parent=None):
         super().__init__(parent)
         self.orchestrator = orchestrator
+        self.current_page = 1
+        self.page_size = 50
+        self.total_logs = 0
+        self.current_logs = []
         self._init_ui()
         self._load_logs()
 
@@ -56,6 +67,10 @@ class LogsPage(QWidget):
         refresh_btn.clicked.connect(self._load_logs)
         toolbar.addWidget(refresh_btn)
 
+        export_btn = QPushButton("📁 导出")
+        export_btn.clicked.connect(self._export_logs)
+        toolbar.addWidget(export_btn)
+
         clear_btn = QPushButton("🗑 清空日志")
         clear_btn.clicked.connect(self._clear_logs)
         toolbar.addWidget(clear_btn)
@@ -80,15 +95,59 @@ class LogsPage(QWidget):
         header.setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)
 
         layout.addWidget(self.table)
+
+        # 分页控件
+        pagination = QHBoxLayout()
+        pagination.addStretch()
+
+        prev_btn = QPushButton("⬅️ 上一页")
+        prev_btn.clicked.connect(self._prev_page)
+        pagination.addWidget(prev_btn)
+
+        self.page_label = QLabel("第 1 页 / 共 1 页")
+        pagination.addWidget(self.page_label)
+
+        next_btn = QPushButton("下一页 ➡️")
+        next_btn.clicked.connect(self._next_page)
+        pagination.addWidget(next_btn)
+
+        pagination.addWidget(QLabel("每页显示:"))
+        self.page_size_spin = QSpinBox()
+        self.page_size_spin.setMinimum(10)
+        self.page_size_spin.setMaximum(200)
+        self.page_size_spin.setSingleStep(10)
+        self.page_size_spin.setValue(self.page_size)
+        self.page_size_spin.valueChanged.connect(self._on_page_size_changed)
+        pagination.addWidget(self.page_size_spin)
+
+        pagination.addStretch()
+
+        layout.addLayout(pagination)
         self.setLayout(layout)
 
     def _load_logs(self):
         """加载日志列表"""
         log_type = self.log_type_combo.currentText()
         level_filter = self.log_level_combo.currentText()
-        logs = self._collect_logs(log_type)
+        all_logs = self._collect_logs(log_type)
         if level_filter != "全部":
-            logs = [item for item in logs if item["level"] == level_filter]
+            all_logs = [item for item in all_logs if item["level"] == level_filter]
+
+        self.current_logs = all_logs
+        self.total_logs = len(all_logs)
+
+        # 计算总页数
+        total_pages = max(1, (self.total_logs + self.page_size - 1) // self.page_size)
+        if self.current_page > total_pages:
+            self.current_page = max(1, total_pages)
+
+        # 更新分页标签
+        self.page_label.setText(f"第 {self.current_page} 页 / 共 {total_pages} 页 (总计 {self.total_logs} 条)")
+
+        # 获取当前页的日志
+        start_idx = (self.current_page - 1) * self.page_size
+        end_idx = min(start_idx + self.page_size, self.total_logs)
+        logs = all_logs[start_idx:end_idx]
 
         self.table.setRowCount(len(logs))
 
@@ -146,22 +205,129 @@ class LogsPage(QWidget):
         reply = QMessageBox.question(
             self,
             "确认清空",
-            "确定要清空所有日志吗？此操作不可恢复。",
+            "确定要清空所有日志吗？\n\n这将删除:\n- 工具调用记录\n- 审批记录\n- 智能体运行记录\n- 任务步骤记录\n\n此操作不可恢复。",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
         )
 
         if reply == QMessageBox.StandardButton.Yes:
             try:
                 with self.orchestrator.db_manager.get_session() as db_session:
-                    from yfai.store.db import ToolCall
+                    from yfai.store.db import ToolCall, JobRun, JobStep
 
-                    db_session.query(ToolCall).delete()
+                    # 删除任务步骤记录
+                    step_count = db_session.query(JobStep).delete()
+
+                    # 删除任务运行记录
+                    job_count = db_session.query(JobRun).delete()
+
+                    # 删除工具调用记录
+                    tool_count = db_session.query(ToolCall).delete()
+
                     db_session.commit()
 
-                QMessageBox.information(self, "成功", "已清空工具与审批日志，智能体运行记录保留")
+                QMessageBox.information(
+                    self,
+                    "成功",
+                    f"已清空所有日志记录:\n- 工具调用: {tool_count} 条\n- 任务运行: {job_count} 条\n- 任务步骤: {step_count} 条"
+                )
                 self._load_logs()
             except Exception as e:
                 QMessageBox.critical(self, "失败", f"清空日志失败: {e}")
+
+    def _prev_page(self):
+        """上一页"""
+        if self.current_page > 1:
+            self.current_page -= 1
+            self._load_logs()
+
+    def _next_page(self):
+        """下一页"""
+        total_pages = max(1, (self.total_logs + self.page_size - 1) // self.page_size)
+        if self.current_page < total_pages:
+            self.current_page += 1
+            self._load_logs()
+
+    def _on_page_size_changed(self, value: int):
+        """每页显示数量改变"""
+        self.page_size = value
+        self.current_page = 1
+        self._load_logs()
+
+    def _export_logs(self):
+        """导出日志"""
+        if not self.current_logs:
+            QMessageBox.information(self, "提示", "没有可导出的日志")
+            return
+
+        # 让用户选择导出格式
+        reply = QMessageBox.question(
+            self,
+            "选择导出格式",
+            "请选择导出格式:\n\nYes = CSV格式\nNo = JSON格式",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No | QMessageBox.StandardButton.Cancel
+        )
+
+        if reply == QMessageBox.StandardButton.Cancel:
+            return
+
+        export_format = "csv" if reply == QMessageBox.StandardButton.Yes else "json"
+
+        # 选择保存路径
+        default_filename = f"yfai_logs_{datetime.now().strftime('%Y%m%d_%H%M%S')}.{export_format}"
+        file_path, _ = QFileDialog.getSaveFileName(
+            self,
+            "导出日志",
+            default_filename,
+            f"{'CSV文件 (*.csv)' if export_format == 'csv' else 'JSON文件 (*.json)'}"
+        )
+
+        if not file_path:
+            return
+
+        try:
+            if export_format == "csv":
+                self._export_to_csv(file_path)
+            else:
+                self._export_to_json(file_path)
+
+            QMessageBox.information(self, "成功", f"日志已导出到: {file_path}")
+        except Exception as e:
+            QMessageBox.critical(self, "失败", f"导出日志失败: {e}")
+
+    def _export_to_csv(self, file_path: str):
+        """导出为CSV格式"""
+        with open(file_path, 'w', newline='', encoding='utf-8') as csvfile:
+            fieldnames = ['时间', '类型', '级别', '消息', '详情']
+            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+
+            writer.writeheader()
+            for log in self.current_logs:
+                timestamp = log["timestamp"]
+                ts_text = timestamp.strftime("%Y-%m-%d %H:%M:%S") if timestamp else "-"
+                writer.writerow({
+                    '时间': ts_text,
+                    '类型': log["type"],
+                    '级别': log["level"],
+                    '消息': log["message"],
+                    '详情': log["details"]
+                })
+
+    def _export_to_json(self, file_path: str):
+        """导出为JSON格式"""
+        export_data = []
+        for log in self.current_logs:
+            timestamp = log["timestamp"]
+            ts_text = timestamp.strftime("%Y-%m-%d %H:%M:%S") if timestamp else None
+            export_data.append({
+                'timestamp': ts_text,
+                'type': log["type"],
+                'level': log["level"],
+                'message': log["message"],
+                'details': log["details"]
+            })
+
+        with open(file_path, 'w', encoding='utf-8') as jsonfile:
+            json.dump(export_data, jsonfile, ensure_ascii=False, indent=2)
 
     def _collect_logs(self, log_type: str):
         """从数据库收集日志"""

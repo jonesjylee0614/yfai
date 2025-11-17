@@ -87,6 +87,7 @@ class ChatWidget(QWidget):
         self.current_assistant_name: Optional[str] = None
         self._display_provider_label = "默认"
         self._display_model_text = "默认"
+        self._active_tasks = set()  # 跟踪活动的异步任务
 
         self._init_ui()
         # 延迟到事件循环启动后再创建会话
@@ -215,8 +216,10 @@ class ChatWidget(QWidget):
 
         # 创建任务并处理可能的异常
         task = asyncio.create_task(create())
+        self._active_tasks.add(task)
 
         def handle_exception(t):
+            self._active_tasks.discard(t)
             if t.exception():
                 logging.error(f"异步任务失败: {t.exception()}")
 
@@ -307,8 +310,10 @@ class ChatWidget(QWidget):
 
         # 创建任务并处理可能的异常
         task = asyncio.create_task(send())
+        self._active_tasks.add(task)
 
         def handle_exception(t):
+            self._active_tasks.discard(t)
             if t.exception():
                 import logging
                 logging.error(f"发送任务异常: {t.exception()}")
@@ -431,4 +436,11 @@ class ChatWidget(QWidget):
             None: "默认",
         }
         return mapping.get(provider_key, provider_key or "默认")
+
+    def cancel_all_tasks(self) -> None:
+        """取消所有活动的异步任务"""
+        for task in list(self._active_tasks):
+            if not task.done():
+                task.cancel()
+        self._active_tasks.clear()
 

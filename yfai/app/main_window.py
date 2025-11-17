@@ -360,7 +360,27 @@ class MainWindow(QMainWindow):
             return
         assistant_id = self.assistant_combo.currentData()
         assistant = self._assistant_cache.get(assistant_id)
-        self._activate_assistant(assistant, focus_chat=False, reset_session=True)
+
+        # 如果选择了助手，检查是否有该助手的最近会话
+        reset_session = True
+        if assistant_id:
+            recent_session = self._find_recent_assistant_session(assistant_id)
+            if recent_session:
+                # 提示用户是否继续最近的会话
+                reply = QMessageBox.question(
+                    self,
+                    "继续会话",
+                    f"找到该助手最近的会话「{recent_session['title']}」\n是否继续该会话？\n\n选择「否」将创建新会话。",
+                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                    QMessageBox.StandardButton.Yes
+                )
+
+                if reply == QMessageBox.StandardButton.Yes:
+                    # 继续旧会话
+                    self._on_session_resume(recent_session['id'])
+                    return
+
+        self._activate_assistant(assistant, focus_chat=False, reset_session=reset_session)
 
     def _on_assistant_requested(self, assistant: Dict[str, Any]) -> None:
         """助手管理页请求使用某个助手"""
@@ -471,6 +491,41 @@ class MainWindow(QMainWindow):
             self.statusBar.showMessage(f"已加载会话: {session.title}")
         except Exception as exc:
             QMessageBox.critical(self, "错误", f"加载会话失败: {exc}")
+
+    def _find_recent_assistant_session(self, assistant_id: str) -> Optional[Dict[str, Any]]:
+        """查找助手的最近会话
+
+        Args:
+            assistant_id: 助手ID
+
+        Returns:
+            最近的会话信息，如果没有则返回 None
+        """
+        try:
+            with self.orchestrator.db_manager.get_session() as db_session:
+                from yfai.store.db import Session as DbSession
+                from datetime import datetime, timedelta
+
+                # 查找该助手最近7天内的会话
+                cutoff_time = datetime.utcnow() - timedelta(days=7)
+                session = (
+                    db_session.query(DbSession)
+                    .filter(DbSession.assistant_id == assistant_id)
+                    .filter(DbSession.updated_at >= cutoff_time)
+                    .order_by(DbSession.updated_at.desc())
+                    .first()
+                )
+
+                if session:
+                    return {
+                        'id': session.id,
+                        'title': session.title,
+                        'updated_at': session.updated_at
+                    }
+        except Exception:
+            pass
+
+        return None
 
     def _apply_session_provider_model(self, provider_name: Optional[str], model_name: Optional[str]) -> None:
         """根据会话记录更新当前 Provider/模型"""
@@ -656,4 +711,16 @@ class MainWindow(QMainWindow):
         else:
             self.model_combo.setEditText("")
             self.chat_widget.current_model = None
+
+    def closeEvent(self, event):
+        """关闭窗口事件处理"""
+        # 取消所有活动的异步任务
+        try:
+            self.chat_widget.cancel_all_tasks()
+        except Exception as e:
+            import logging
+            logging.error(f"取消任务失败: {e}")
+
+        # 接受关闭事件
+        event.accept()
 

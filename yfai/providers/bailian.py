@@ -78,8 +78,21 @@ class BailianProvider(BaseProvider):
             result = response.json()
 
         # 解析响应
-        choice = result["choices"][0]
-        message = choice["message"]
+        # 验证响应结构
+        if not isinstance(result, dict):
+            raise ValueError(f"无效的响应格式: {type(result)}")
+
+        choices = result.get("choices", [])
+        if not choices or len(choices) == 0:
+            raise ValueError("响应中没有choices数据")
+
+        choice = choices[0]
+        if not isinstance(choice, dict):
+            raise ValueError(f"无效的choice格式: {type(choice)}")
+
+        message = choice.get("message")
+        if not message or not isinstance(message, dict):
+            raise ValueError(f"无效的message格式: {type(message)}")
 
         return ChatResponse(
             content=message.get("content", ""),
@@ -141,18 +154,23 @@ class BailianProvider(BaseProvider):
 
                         try:
                             import json
+                            import logging
 
                             chunk = json.loads(data_str)
                             if "choices" in chunk and len(chunk["choices"]) > 0:
-                                delta = chunk["choices"][0].get("delta", {})
-                                content = delta.get("content", "")
-                                if content:
-                                    yield content
-                        except json.JSONDecodeError:
+                                delta = chunk["choices"][0].get("delta")
+                                if delta and isinstance(delta, dict):
+                                    content = delta.get("content", "")
+                                    if content:
+                                        yield content
+                        except json.JSONDecodeError as e:
+                            logging.warning(f"流式响应JSON解析失败: {e}, 数据: {data_str[:100]}")
                             continue
 
     async def health_check(self) -> bool:
         """健康检查"""
+        import logging
+
         try:
             async with httpx.AsyncClient(timeout=10) as client:
                 response = await client.get(
@@ -160,7 +178,8 @@ class BailianProvider(BaseProvider):
                     headers={"Authorization": f"Bearer {self.api_key}"},
                 )
                 return response.status_code == 200
-        except Exception:
+        except Exception as e:
+            logging.warning(f"百炼健康检查失败: {e}")
             return False
 
     async def list_models(self) -> List[str]:

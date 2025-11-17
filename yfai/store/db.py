@@ -459,6 +459,44 @@ class Connector(Base):
         }
 
 
+class AuditLog(Base):
+    """审计日志表"""
+
+    __tablename__ = "audit_logs"
+
+    id = Column(String(36), primary_key=True)
+    timestamp = Column(DateTime, default=datetime.utcnow, nullable=False)
+    action_type = Column(String(50), nullable=False)  # approval_request / approval_result / tool_call / etc
+    user_id = Column(String(36), nullable=True)
+    tool_name = Column(String(100), nullable=True)
+    risk_level = Column(String(20), nullable=True)  # low / medium / high / critical
+    approval_status = Column(String(20), nullable=True)  # approved / rejected / timeout
+    request_data = Column(Text, nullable=True)  # JSON: 请求数据
+    result_data = Column(Text, nullable=True)  # JSON: 结果数据
+    ip_address = Column(String(50), nullable=True)
+    session_id = Column(String(36), ForeignKey("sessions.id"), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    # 关系
+    session = relationship("Session")
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "id": self.id,
+            "timestamp": self.timestamp.isoformat() if self.timestamp else None,
+            "action_type": self.action_type,
+            "user_id": self.user_id,
+            "tool_name": self.tool_name,
+            "risk_level": self.risk_level,
+            "approval_status": self.approval_status,
+            "request_data": json.loads(self.request_data) if self.request_data else None,
+            "result_data": json.loads(self.result_data) if self.result_data else None,
+            "ip_address": self.ip_address,
+            "session_id": self.session_id,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+        }
+
+
 class DatabaseManager:
     """数据库管理器"""
 
@@ -603,5 +641,6 @@ class DatabaseManager:
                 "job_steps": session.query(JobStep).count(),
                 "automation_tasks": session.query(AutomationTask).count(),
                 "connectors": session.query(Connector).count(),
+                "audit_logs": session.query(AuditLog).count(),
             }
 

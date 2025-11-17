@@ -12,6 +12,7 @@ from ..mcp import McpClient, McpRegistry
 from ..localops import FileSystemOps, ShellOps, ProcessOps, NetworkOps
 from ..security import SecurityGuard, SecurityPolicy, ApprovalRequest, ApprovalResult, RiskLevel
 from ..store import Assistant, DatabaseManager, Message, Session, ToolCall, ProviderStatus
+from ..search import SearchManager
 from .agent_runner import AgentRunner
 
 
@@ -26,6 +27,7 @@ class Orchestrator:
         self.mcp_registry = McpRegistry()
         self.security_guard = SecurityGuard(config)
         self.security_policy = SecurityPolicy(config)
+        self.search_manager = SearchManager(config)
 
         # 初始化数据库
         db_path = config.get("database", {}).get("path", "data/yfai.db")
@@ -718,21 +720,44 @@ class Orchestrator:
         except Exception as e:
             print(f"持久化搜索结果失败: {e}")
 
-    async def _web_search(self, query: str, count: int = 5) -> Dict[str, Any]:
-        """执行网络搜索（占位实现）
+    async def _web_search(self, query: str, count: int = 5, engine: Optional[str] = None) -> Dict[str, Any]:
+        """执行网络搜索
 
         Args:
             query: 搜索查询
             count: 返回结果数量
+            engine: 指定搜索引擎
 
         Returns:
             搜索结果
         """
-        # TODO: 实现实际的搜索功能（集成搜索 API）
-        return {
-            "success": True,
-            "query": query,
-            "results": [],
-            "message": "搜索功能待实现，请配置搜索 API",
-        }
+        try:
+            results = await self.search_manager.search(
+                query=query,
+                max_results=count,
+                engine=engine,
+            )
+
+            if not results:
+                return {
+                    "success": False,
+                    "query": query,
+                    "results": [],
+                    "message": "未找到搜索结果或搜索引擎不可用",
+                }
+
+            return {
+                "success": True,
+                "query": query,
+                "count": len(results),
+                "results": [result.to_dict() for result in results],
+            }
+
+        except Exception as e:
+            return {
+                "success": False,
+                "query": query,
+                "results": [],
+                "error": str(e),
+            }
 

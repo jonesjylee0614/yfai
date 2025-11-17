@@ -2,7 +2,7 @@
 
 import os
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Callable, List
 
 import yaml
 from dotenv import load_dotenv
@@ -11,11 +11,12 @@ from yfai.providers.defaults import DEFAULT_PROVIDER_MODELS
 
 
 class ConfigManager:
-    """配置管理器"""
+    """配置管理器 - 支持热更新"""
 
     def __init__(self, config_path: str = "configs/config.yaml"):
         self.config_path = Path(config_path)
         self.config: Dict[str, Any] = {}
+        self._change_listeners: List[Callable[[Dict[str, Any]], None]] = []
         self._load_env()
         self._load_config()
 
@@ -95,16 +96,21 @@ class ConfigManager:
 
         config[keys[-1]] = value
 
-    def save(self, path: Optional[str] = None) -> None:
+    def save(self, path: Optional[str] = None, notify: bool = True) -> None:
         """保存配置
 
         Args:
             path: 保存路径
+            notify: 是否通知监听器
         """
         save_path = Path(path) if path else self.config_path
 
         with open(save_path, "w", encoding="utf-8") as f:
             yaml.dump(self.config, f, allow_unicode=True, default_flow_style=False)
+
+        # 通知所有监听器配置已更新
+        if notify:
+            self._notify_listeners()
 
     def get_all(self) -> Dict[str, Any]:
         """获取所有配置
@@ -113,4 +119,62 @@ class ConfigManager:
             Dict[str, Any]: 配置字典
         """
         return self.config.copy()
+
+    def reload(self) -> None:
+        """重新加载配置文件"""
+        old_config = self.config.copy()
+        self._load_config()
+
+        # 检查配置是否有变化
+        if old_config != self.config:
+            self._notify_listeners()
+
+    def add_change_listener(self, listener: Callable[[Dict[str, Any]], None]) -> None:
+        """添加配置变更监听器
+
+        Args:
+            listener: 监听器函数，接收新配置作为参数
+        """
+        if listener not in self._change_listeners:
+            self._change_listeners.append(listener)
+
+    def remove_change_listener(self, listener: Callable[[Dict[str, Any]], None]) -> None:
+        """移除配置变更监听器
+
+        Args:
+            listener: 监听器函数
+        """
+        if listener in self._change_listeners:
+            self._change_listeners.remove(listener)
+
+    def _notify_listeners(self) -> None:
+        """通知所有监听器配置已更新"""
+        config_copy = self.config.copy()
+        for listener in self._change_listeners:
+            try:
+                listener(config_copy)
+            except Exception as e:
+                print(f"配置监听器执行失败: {e}")
+
+    def update_from_dict(self, updates: Dict[str, Any], save_to_file: bool = True) -> None:
+        """从字典批量更新配置
+
+        Args:
+            updates: 更新的配置字典
+            save_to_file: 是否保存到文件
+        """
+        def deep_update(target: dict, source: dict) -> None:
+            """深度更新字典"""
+            for key, value in source.items():
+                if key in target and isinstance(target[key], dict) and isinstance(value, dict):
+                    deep_update(target[key], value)
+                else:
+                    target[key] = value
+
+        deep_update(self.config, updates)
+
+        if save_to_file:
+            self.save(notify=True)
+        else:
+            self._notify_listeners()
 

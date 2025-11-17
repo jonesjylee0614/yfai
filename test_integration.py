@@ -35,6 +35,8 @@ async def test_database():
     try:
         db = DatabaseManager("data/test.db")
         db.init_builtin_assistants()
+        db.init_builtin_agents()
+        db.init_demo_records()
         stats = db.get_stats()
         print(f"  [OK] Database working - {stats}")
         return True

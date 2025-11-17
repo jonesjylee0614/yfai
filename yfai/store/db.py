@@ -4,7 +4,8 @@
 """
 
 import json
-from datetime import datetime
+import uuid
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -586,6 +587,161 @@ class DatabaseManager:
                 if not existing:
                     agent = Agent(**agent_data)
                     session.add(agent)
+
+            session.commit()
+
+    def init_demo_records(self) -> None:
+        """初始化演示用的连接器、任务、知识库等数据"""
+
+        now = datetime.utcnow()
+
+        with self.get_session() as session:
+            if session.query(Connector).count() == 0:
+                connectors = [
+                    Connector(
+                        id="connector-github",
+                        name="GitHub 企业仓库",
+                        type="git",
+                        description="克隆并同步企业内部Git仓库",
+                        config=json.dumps(
+                            {
+                                "repo_url": "https://github.com/example/project.git",
+                                "branch": "main",
+                                "token_env": "GITHUB_TOKEN",
+                            },
+                            ensure_ascii=False,
+                        ),
+                        status="connected",
+                        last_test_at=now - timedelta(hours=6),
+                        use_count=3,
+                    ),
+                    Connector(
+                        id="connector-monitor",
+                        name="Prometheus API",
+                        type="http",
+                        description="查询Prometheus指标以生成巡检报告",
+                        config=json.dumps(
+                            {
+                                "base_url": "https://monitor.example.com/api/v1",
+                                "auth": {"type": "bearer", "token_env": "PROM_TOKEN"},
+                            },
+                            ensure_ascii=False,
+                        ),
+                        status="disconnected",
+                        last_test_at=now - timedelta(days=1),
+                        use_count=0,
+                    ),
+                ]
+                session.add_all(connectors)
+
+            if session.query(KnowledgeBase).count() == 0:
+                knowledge_bases = [
+                    KnowledgeBase(
+                        id="kb-engineering",
+                        name="工程 Best Practice",
+                        description="团队内沉淀的工程规范、代码评审Checklist",
+                        source_type="directory",
+                        source_config=json.dumps({"path": "docs/handbook"}, ensure_ascii=False),
+                        embedding_model="dashscope:text-embedding-v1",
+                        chunk_size=500,
+                        chunk_overlap=50,
+                        chunk_count=128,
+                        storage_size=256000,
+                        query_count=5,
+                        indexed_at=now - timedelta(days=2),
+                    ),
+                    KnowledgeBase(
+                        id="kb-release",
+                        name="发布记录",
+                        description="近6个月的变更日志与回归总结",
+                        source_type="documents",
+                        source_config=json.dumps({"path": "docs/changelog"}, ensure_ascii=False),
+                        embedding_model="m3e-base",
+                        chunk_size=400,
+                        chunk_overlap=30,
+                        chunk_count=64,
+                        storage_size=128000,
+                        query_count=2,
+                        indexed_at=now - timedelta(days=7),
+                    ),
+                ]
+                session.add_all(knowledge_bases)
+
+            if session.query(AutomationTask).count() == 0:
+                tasks = [
+                    AutomationTask(
+                        id="task-daily-build",
+                        name="每日构建巡检",
+                        description="每天9点调用DevOps智能体执行代码拉取+单测",
+                        trigger_type="cron",
+                        cron_expr="0 9 * * *",
+                        agent_id="agent-devops",
+                        goal="拉取最新代码、运行pytest并生成总结",
+                        params=json.dumps({"branch": "develop"}, ensure_ascii=False),
+                        enabled=True,
+                        last_run_at=now - timedelta(days=1),
+                        last_status="success",
+                        run_count=12,
+                    ),
+                    AutomationTask(
+                        id="task-weekly-notes",
+                        name="周报知识整理",
+                        description="每周整理知识库变更并输出周报",
+                        trigger_type="cron",
+                        cron_expr="0 18 * * FRI",
+                        agent_id="agent-knowledge",
+                        goal="扫描知识库，提取新增/更新文档并总结",
+                        enabled=False,
+                        run_count=0,
+                    ),
+                ]
+                session.add_all(tasks)
+
+            if session.query(JobRun).count() == 0:
+                job_id = str(uuid.uuid4())
+                job = JobRun(
+                    id=job_id,
+                    type="agent",
+                    name="DevOps 助手 - 构建检查",
+                    status="success",
+                    agent_id="agent-devops",
+                    goal="检查main分支构建并输出报告",
+                    plan=json.dumps([
+                        {"index": 0, "name": "Git 拉取", "type": "tool"},
+                        {"index": 1, "name": "执行Pytest", "type": "tool"},
+                    ], ensure_ascii=False),
+                    summary="构建通过，Pytest 120/120 绿，全量压测未触发",
+                    created_at=now - timedelta(hours=3),
+                    started_at=now - timedelta(hours=3),
+                    ended_at=now - timedelta(hours=2, minutes=45),
+                )
+                session.add(job)
+
+                steps = [
+                    JobStep(
+                        id=str(uuid.uuid4()),
+                        job_id=job_id,
+                        step_index=0,
+                        step_type="tool",
+                        step_name="shell.execute",
+                        request_snapshot=json.dumps({"cmd": "git pull"}, ensure_ascii=False),
+                        response_snapshot=json.dumps({"stdout": "Already up to date."}, ensure_ascii=False),
+                        status="success",
+                        duration_ms=1200,
+                    ),
+                    JobStep(
+                        id=str(uuid.uuid4()),
+                        job_id=job_id,
+                        step_index=1,
+                        step_type="tool",
+                        step_name="shell.execute",
+                        request_snapshot=json.dumps({"cmd": "pytest"}, ensure_ascii=False),
+                        response_snapshot=json.dumps({"stdout": "120 passed"}, ensure_ascii=False),
+                        status="success",
+                        duration_ms=5600,
+                    ),
+                ]
+                session.add_all(steps)
 
             session.commit()
 

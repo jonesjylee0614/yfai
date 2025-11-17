@@ -1,56 +1,35 @@
 """设置对话框"""
 
+import asyncio
 from typing import Any, Dict
 
 from PyQt6.QtWidgets import (
     QDialog,
     QVBoxLayout,
-    QTabWidget,
-    QWidget,
-    QLabel,
-    QLineEdit,
-    QCheckBox,
-    QSpinBox,
     QPushButton,
     QHBoxLayout,
-    QFormLayout,
+    QMessageBox,
 )
-from PyQt6.QtCore import Qt
+
+from .settings_form import SettingsForm
 
 
 class SettingsDialog(QDialog):
     """设置对话框"""
 
-    def __init__(self, config: Dict[str, Any], parent=None):
+    def __init__(self, orchestrator, config_manager, parent=None):
         super().__init__(parent)
-        self.config = config
-        self._init_ui()
+        self.orchestrator = orchestrator
+        self.config_manager = config_manager
+        self.saved_config: Dict[str, Any] | None = None
 
-    def _init_ui(self):
-        """初始化UI"""
         self.setWindowTitle("设置")
-        self.resize(600, 500)
+        self.resize(700, 560)
 
-        layout = QVBoxLayout()
+        layout = QVBoxLayout(self)
+        self.form = SettingsForm(config_manager.get_all())
+        layout.addWidget(self.form)
 
-        # 标签页
-        tabs = QTabWidget()
-
-        # 通用设置
-        general_tab = self._create_general_tab()
-        tabs.addTab(general_tab, "通用")
-
-        # Provider设置
-        provider_tab = self._create_provider_tab()
-        tabs.addTab(provider_tab, "模型提供商")
-
-        # 安全设置
-        security_tab = self._create_security_tab()
-        tabs.addTab(security_tab, "安全")
-
-        layout.addWidget(tabs)
-
-        # 按钮
         button_layout = QHBoxLayout()
         button_layout.addStretch()
 
@@ -59,82 +38,54 @@ class SettingsDialog(QDialog):
         button_layout.addWidget(cancel_btn)
 
         save_btn = QPushButton("保存")
-        save_btn.clicked.connect(self.accept)
+        save_btn.clicked.connect(self._on_accept)
         button_layout.addWidget(save_btn)
 
         layout.addLayout(button_layout)
 
-        self.setLayout(layout)
+        self.form.refresh_models_btn.clicked.connect(self._refresh_models)
+        self._refresh_models()
 
-    def _create_general_tab(self) -> QWidget:
-        """创建通用设置标签页"""
-        widget = QWidget()
-        layout = QFormLayout()
+    def _on_accept(self) -> None:
+        try:
+            self._save_settings()
+        except Exception as exc:
+            QMessageBox.critical(self, "保存失败", str(exc))
+            return
+        self.accept()
 
-        # 自动保存
-        auto_save_check = QCheckBox()
-        auto_save_check.setChecked(self.config.get("app", {}).get("auto_save", True))
-        layout.addRow("自动保存会话:", auto_save_check)
+    def _save_settings(self) -> None:
+        values = self.form.collect_settings()
 
-        # 流式输出
-        stream_check = QCheckBox()
-        stream_check.setChecked(
-            self.config.get("app", {}).get("stream_output", True)
-        )
-        layout.addRow("流式输出:", stream_check)
+        for key, value in values.get("app", {}).items():
+            self.config_manager.set(f"app.{key}", value)
 
-        # 超时设置
-        timeout_spin = QSpinBox()
-        timeout_spin.setRange(10, 300)
-        timeout_spin.setValue(self.config.get("app", {}).get("timeout_sec", 60))
-        layout.addRow("超时时间(秒):", timeout_spin)
+        for provider, cfg in values.get("providers", {}).items():
+            for key, value in cfg.items():
+                self.config_manager.set(f"providers.{provider}.{key}", value)
 
-        widget.setLayout(layout)
-        return widget
+        for key, value in values.get("security", {}).items():
+            self.config_manager.set(f"security.{key}", value)
 
-    def _create_provider_tab(self) -> QWidget:
-        """创建Provider设置标签页"""
-        widget = QWidget()
-        layout = QFormLayout()
+        self.config_manager.save()
+        self.saved_config = self.config_manager.get_all()
 
-        # 百炼API Key
-        bailian_key = QLineEdit()
-        bailian_key.setPlaceholderText("输入百炼API Key")
-        bailian_key.setEchoMode(QLineEdit.EchoMode.Password)
-        layout.addRow("百炼API Key:", bailian_key)
+    def _refresh_models(self) -> None:
+        self.form.refresh_models_btn.setEnabled(False)
+        self.form.models_status_label.setText("正在刷新模型列表…")
 
-        # Ollama地址
-        ollama_base = QLineEdit()
-        ollama_base.setText(
-            self.config.get("providers", {})
-            .get("ollama", {})
-            .get("api_base", "http://127.0.0.1:11434")
-        )
-        layout.addRow("Ollama地址:", ollama_base)
+        async def fetch():
+            try:
+                models = await self.orchestrator.provider_manager.list_all_models()
+                self.form.set_available_models(models)
+            except Exception as exc:
+                self.form.models_status_label.setText(f"加载失败: {exc}")
+            else:
+                if not models:
+                    self.form.models_status_label.setText("未能读取到模型信息")
+            finally:
+                self.form.refresh_models_btn.setEnabled(True)
 
-        widget.setLayout(layout)
-        return widget
-
-    def _create_security_tab(self) -> QWidget:
-        """创建安全设置标签页"""
-        widget = QWidget()
-        layout = QFormLayout()
-
-        # 自动审计
-        auto_audit = QCheckBox()
-        auto_audit.setChecked(
-            self.config.get("security", {}).get("auto_audit", True)
-        )
-        layout.addRow("自动审计:", auto_audit)
-
-        # 日志保留天数
-        log_retention = QSpinBox()
-        log_retention.setRange(1, 365)
-        log_retention.setValue(
-            self.config.get("security", {}).get("log_retention_days", 30)
-        )
-        layout.addRow("日志保留天数:", log_retention)
-
-        widget.setLayout(layout)
-        return widget
+        loop = asyncio.get_event_loop()
+        loop.create_task(fetch())
 

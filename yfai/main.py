@@ -37,9 +37,11 @@ def main():
 
         # 初始化数据库
         orchestrator.db_manager.init_builtin_assistants()
+        orchestrator.db_manager.init_builtin_agents()
+        orchestrator.db_manager.init_demo_records()
 
         # 创建主窗口
-        window = MainWindow(orchestrator, config)
+        window = MainWindow(orchestrator, config_manager)
         window.show()
 
         # 运行事件循环

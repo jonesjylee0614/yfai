@@ -7,6 +7,8 @@ from typing import Any, Dict, Optional
 import yaml
 from dotenv import load_dotenv
 
+from yfai.providers.defaults import DEFAULT_PROVIDER_MODELS
+
 
 class ConfigManager:
     """配置管理器"""
@@ -36,6 +38,22 @@ class ConfigManager:
 
         with open(self.config_path, "r", encoding="utf-8") as f:
             self.config = yaml.safe_load(f)
+        self._ensure_provider_defaults()
+
+    def _ensure_provider_defaults(self) -> None:
+        """Populate provider sections with sample model data if missing."""
+        providers_cfg = self.config.setdefault("providers", {})
+
+        for name, defaults in DEFAULT_PROVIDER_MODELS.items():
+            provider_cfg = providers_cfg.setdefault(name, {})
+
+            provider_cfg.setdefault("api_base", defaults["api_base"])
+            provider_cfg.setdefault("timeout", defaults["timeout"])
+            provider_cfg.setdefault("max_retries", defaults["max_retries"])
+            provider_cfg.setdefault("default_model", defaults["default_model"])
+
+            if not provider_cfg.get("models"):
+                provider_cfg["models"] = defaults["models"]
 
     def get(self, key: str, default: Any = None) -> Any:
         """获取配置值

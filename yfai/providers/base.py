@@ -34,6 +34,7 @@ class ChatResponse(BaseModel):
     tool_calls: Optional[List[Dict[str, Any]]] = Field(None, description="工具调用")
     usage: Optional[Dict[str, int]] = Field(None, description="Token使用统计")
     model: Optional[str] = Field(None, description="使用的模型")
+    provider: Optional[str] = Field(None, description="实际提供商名称")
 
 
 class BaseProvider(ABC):

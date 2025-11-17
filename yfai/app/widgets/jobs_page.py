@@ -14,11 +14,14 @@ from PyQt6.QtWidgets import (
     QTableWidget,
     QTableWidgetItem,
     QHeaderView,
+    QComboBox,
+    QLineEdit,
 )
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QFont
 import json
 from datetime import datetime
+from sqlalchemy import or_
 
 
 class JobsPage(QWidget):
@@ -54,6 +57,28 @@ class JobsPage(QWidget):
 
         layout.addLayout(title_layout)
 
+        filter_layout = QHBoxLayout()
+        filter_layout.addWidget(QLabel("状态:"))
+        self.status_filter = QComboBox()
+        self.status_filter.addItems(["全部", "运行中", "成功", "失败"])
+        self.status_filter.currentIndexChanged.connect(self._load_jobs)
+        filter_layout.addWidget(self.status_filter)
+
+        filter_layout.addWidget(QLabel("智能体:"))
+        self.agent_filter = QComboBox()
+        self.agent_filter.addItem("全部", "")
+        self.agent_filter.currentIndexChanged.connect(self._load_jobs)
+        filter_layout.addWidget(self.agent_filter)
+
+        filter_layout.addWidget(QLabel("搜索:"))
+        self.search_input = QLineEdit()
+        self.search_input.setPlaceholderText("按名称或目标关键字")
+        self.search_input.textChanged.connect(self._load_jobs)
+        filter_layout.addWidget(self.search_input)
+        filter_layout.addStretch()
+        layout.addLayout(filter_layout)
+        self._populate_agent_filter()
+
         # Job 列表
         self.job_list = QListWidget()
         self.job_list.itemClicked.connect(self._on_job_selected)
@@ -73,6 +98,21 @@ class JobsPage(QWidget):
         # 加载 Job 列表
         self._load_jobs()
 
+    def _populate_agent_filter(self) -> None:
+        try:
+            with self.orchestrator.db_manager.get_session() as db_session:
+                from yfai.store.db import Agent
+
+                agents = (
+                    db_session.query(Agent)
+                    .order_by(Agent.name.asc())
+                    .all()
+                )
+                for agent in agents:
+                    self.agent_filter.addItem(agent.name, agent.id)
+        except Exception:
+            pass
+
     def _load_jobs(self):
         """加载 Job 列表"""
         self.job_list.clear()
@@ -81,10 +121,29 @@ class JobsPage(QWidget):
             with self.orchestrator.db_manager.get_session() as db_session:
                 from yfai.store.db import JobRun
 
+                query = db_session.query(JobRun)
+
+                status_text = self.status_filter.currentText() if hasattr(self, "status_filter") else "全部"
+                status_map = {
+                    "运行中": ["pending", "running"],
+                    "成功": ["success"],
+                    "失败": ["failed"],
+                }
+                if status_text in status_map:
+                    query = query.filter(JobRun.status.in_(status_map[status_text]))
+
+                agent_id = self.agent_filter.currentData() if hasattr(self, "agent_filter") else None
+                if agent_id:
+                    query = query.filter(JobRun.agent_id == agent_id)
+
+                keyword = self.search_input.text().strip() if hasattr(self, "search_input") else ""
+                if keyword:
+                    pattern = f"%{keyword}%"
+                    query = query.filter(or_(JobRun.name.like(pattern), JobRun.goal.like(pattern)))
+
                 jobs = (
-                    db_session.query(JobRun)
-                    .order_by(JobRun.created_at.desc())
-                    .limit(100)
+                    query.order_by(JobRun.created_at.desc())
+                    .limit(200)
                     .all()
                 )
 

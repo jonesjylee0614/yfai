@@ -11,7 +11,7 @@ from ..providers import ChatMessage, ChatResponse, ProviderManager
 from ..mcp import McpClient, McpRegistry
 from ..localops import FileSystemOps, ShellOps, ProcessOps, NetworkOps
 from ..security import SecurityGuard, SecurityPolicy, ApprovalRequest, ApprovalResult, RiskLevel
-from ..store import DatabaseManager, Session, Message, ToolCall
+from ..store import Assistant, DatabaseManager, Message, Session, ToolCall
 from .agent_runner import AgentRunner
 
 
@@ -54,6 +54,17 @@ class Orchestrator:
         # 当前会话
         self.current_session_id: Optional[str] = None
 
+    def update_config(self, new_config: Dict[str, Any]) -> None:
+        """刷新运行时配置并重新初始化依赖"""
+
+        self.config = new_config
+        self.provider_manager = ProviderManager(new_config)
+        self.security_guard.apply_config(new_config)
+        self.security_policy = SecurityPolicy(new_config)
+        self.agent_runner.provider_manager = self.provider_manager
+        self.agent_runner.security_guard = self.security_guard
+        self.agent_runner.security_policy = self.security_policy
+
     async def create_session(
         self,
         title: str = "新对话",
@@ -81,6 +92,25 @@ class Orchestrator:
             )
             db_session.add(session)
             db_session.commit()
+
+            if assistant_id:
+                assistant = (
+                    db_session.query(Assistant).filter(Assistant.id == assistant_id).first()
+                )
+                if assistant:
+                    assistant.usage_count = (assistant.usage_count or 0) + 1
+                    assistant.last_used_at = datetime.utcnow()
+                    if assistant.system_prompt:
+                        system_message = Message(
+                            id=str(uuid.uuid4()),
+                            session_id=session_id,
+                            role="system",
+                            content=assistant.system_prompt,
+                            provider=assistant.provider,
+                            model=assistant.model,
+                        )
+                        db_session.add(system_message)
+                db_session.commit()
 
         self.current_session_id = session_id
         return session_id
@@ -110,6 +140,9 @@ class Orchestrator:
         if not session_id:
             session_id = await self.create_session()
 
+        requested_provider = provider or self.provider_manager.get_default_provider_name()
+        requested_model = model or self.provider_manager.get_default_model(requested_provider)
+
         # 保存用户消息
         user_msg_id = str(uuid.uuid4())
         with self.db_manager.get_session() as db_session:
@@ -118,6 +151,8 @@ class Orchestrator:
                 session_id=session_id,
                 role="user",
                 content=user_message,
+                provider=requested_provider,
+                model=requested_model,
             )
             db_session.add(message)
             db_session.commit()
@@ -137,6 +172,8 @@ class Orchestrator:
         )
 
         if response:
+            provider_used = response.provider or requested_provider
+            model_used = response.model or requested_model
             # 保存助手消息
             assistant_msg_id = str(uuid.uuid4())
             with self.db_manager.get_session() as db_session:
@@ -145,8 +182,8 @@ class Orchestrator:
                     session_id=session_id,
                     role="assistant",
                     content=response.content,
-                    provider=provider,
-                    model=response.model,
+                    provider=provider_used,
+                    model=model_used,
                 )
                 db_session.add(message)
                 db_session.commit()
@@ -159,6 +196,7 @@ class Orchestrator:
         session_id: Optional[str] = None,
         provider: Optional[str] = None,
         model: Optional[str] = None,
+        context: Optional[str] = None,
     ) -> AsyncIterator[str]:
         """流式聊天
 
@@ -167,6 +205,7 @@ class Orchestrator:
             session_id: 会话ID
             provider: Provider名称
             model: 模型名称
+            context: 附加的系统/检索上下文
 
         Yields:
             str: 流式输出的文本片段
@@ -176,6 +215,9 @@ class Orchestrator:
         if not session_id:
             session_id = await self.create_session()
 
+        requested_provider = provider or self.provider_manager.get_default_provider_name()
+        requested_model = model or self.provider_manager.get_default_model(requested_provider)
+
         # 保存用户消息
         user_msg_id = str(uuid.uuid4())
         with self.db_manager.get_session() as db_session:
@@ -184,16 +226,21 @@ class Orchestrator:
                 session_id=session_id,
                 role="user",
                 content=user_message,
+                provider=requested_provider,
+                model=requested_model,
             )
             db_session.add(message)
             db_session.commit()
 
         # 获取会话历史
         messages = await self._get_session_messages(session_id)
+        if context:
+            messages.append(ChatMessage(role="system", content=context))
         messages.append(ChatMessage(role="user", content=user_message))
 
         # 获取Provider
         provider_obj = self.provider_manager.get_provider(provider)
+        provider_used = provider or self.provider_manager.get_default_provider_name()
         if not provider_obj:
             yield "错误: Provider不可用"
             return
@@ -206,14 +253,15 @@ class Orchestrator:
 
         # 保存完整响应
         assistant_msg_id = str(uuid.uuid4())
+        resolved_model = model or provider_obj.default_model
         with self.db_manager.get_session() as db_session:
             message = Message(
                 id=assistant_msg_id,
                 session_id=session_id,
                 role="assistant",
                 content=full_response,
-                provider=provider,
-                model=model,
+                provider=provider_used,
+                model=resolved_model,
             )
             db_session.add(message)
             db_session.commit()
@@ -333,6 +381,21 @@ class Orchestrator:
                 db_session.commit()
 
         return result
+
+    async def get_last_assistant_metadata(self, session_id: Optional[str]) -> Optional[Dict[str, Optional[str]]]:
+        """获取指定会话最近一次助手消息的 Provider/模型信息"""
+        if not session_id:
+            return None
+        with self.db_manager.get_session() as db_session:
+            message = (
+                db_session.query(Message)
+                .filter(Message.session_id == session_id, Message.role == "assistant")
+                .order_by(Message.created_at.desc())
+                .first()
+            )
+            if not message:
+                return None
+            return {"provider": message.provider, "model": message.model}
 
     def _get_tool_type(self, tool_name: str) -> str:
         """获取工具类型

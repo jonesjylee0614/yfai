@@ -2,7 +2,7 @@
 
 import uuid
 from datetime import datetime
-from typing import Optional
+from typing import Dict, Optional
 
 from PyQt6.QtWidgets import (
     QWidget,
@@ -21,7 +21,7 @@ from PyQt6.QtWidgets import (
     QCheckBox,
     QDialogButtonBox,
 )
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QColor
 
 
@@ -120,9 +120,13 @@ class AssistantDialog(QDialog):
 class AssistantsPage(QWidget):
     """助手管理页面"""
 
+    assistant_selected = pyqtSignal(dict)
+    assistants_updated = pyqtSignal()
+
     def __init__(self, orchestrator, parent=None):
         super().__init__(parent)
         self.orchestrator = orchestrator
+        self._assistants_cache: Dict[str, dict] = {}
         self._init_ui()
         self._load_assistants()
 
@@ -172,6 +176,9 @@ class AssistantsPage(QWidget):
                 from yfai.store.db import Assistant
 
                 assistants = db_session.query(Assistant).all()
+                self._assistants_cache = {
+                    assistant.id: assistant.to_dict() for assistant in assistants
+                }
                 self.table.setRowCount(len(assistants))
 
                 for row, assistant in enumerate(assistants):
@@ -201,6 +208,8 @@ class AssistantsPage(QWidget):
                     # ID (隐藏)
                     self.table.setItem(row, 5, QTableWidgetItem(assistant.id))
 
+                self.assistants_updated.emit()
+
         except Exception as e:
             QMessageBox.critical(self, "错误", f"加载助手列表失败: {e}")
 
@@ -210,6 +219,13 @@ class AssistantsPage(QWidget):
         layout = QHBoxLayout(widget)
         layout.setContentsMargins(4, 4, 4, 4)
         layout.setSpacing(4)
+
+        # 使用按钮
+        use_btn = QPushButton("💬")
+        use_btn.setMaximumWidth(30)
+        use_btn.setToolTip("在对话中使用")
+        use_btn.clicked.connect(lambda: self._use_assistant(assistant_id))
+        layout.addWidget(use_btn)
 
         # 编辑按钮
         edit_btn = QPushButton("✎")
@@ -227,6 +243,14 @@ class AssistantsPage(QWidget):
             layout.addWidget(delete_btn)
 
         return widget
+
+    def _use_assistant(self, assistant_id: str) -> None:
+        """通知主窗口使用该助手"""
+        assistant = self._assistants_cache.get(assistant_id)
+        if not assistant:
+            QMessageBox.warning(self, "提示", "未找到助手配置")
+            return
+        self.assistant_selected.emit(assistant)
 
     def _create_assistant(self):
         """创建助手"""

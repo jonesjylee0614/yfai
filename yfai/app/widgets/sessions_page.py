@@ -16,13 +16,15 @@ from PyQt6.QtWidgets import (
     QDialogButtonBox,
     QLabel,
 )
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, pyqtSignal
 
 from sqlalchemy import func
 
 
 class SessionsPage(QWidget):
     """会话管理页面"""
+
+    session_resume_requested = pyqtSignal(str)
 
     def __init__(self, orchestrator, parent=None):
         super().__init__(parent)
@@ -138,7 +140,12 @@ class SessionsPage(QWidget):
         layout.setContentsMargins(4, 4, 4, 4)
         layout.setSpacing(4)
 
-        # 查看按钮
+        resume_btn = QPushButton("💬")
+        resume_btn.setMaximumWidth(30)
+        resume_btn.setToolTip("继续对话")
+        resume_btn.clicked.connect(lambda: self._resume_session(session_id))
+        layout.addWidget(resume_btn)
+
         view_btn = QPushButton("👁")
         view_btn.setMaximumWidth(30)
         view_btn.setToolTip("查看消息")
@@ -153,6 +160,10 @@ class SessionsPage(QWidget):
         layout.addWidget(delete_btn)
 
         return widget
+
+    def _resume_session(self, session_id: str) -> None:
+        """通知外部继续该会话"""
+        self.session_resume_requested.emit(session_id)
 
     def _view_session(self, session_id: str):
         """查看会话"""

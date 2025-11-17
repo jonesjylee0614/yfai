@@ -81,6 +81,13 @@ class AgentRunner:
             db_session.commit()
 
             agent_dict = agent.to_dict()
+            if context:
+                provider_override = context.get("provider_override") or context.get("provider")
+                model_override = context.get("model_override") or context.get("model")
+                if provider_override:
+                    agent_dict["default_provider"] = provider_override
+                if model_override:
+                    agent_dict["default_model"] = model_override
 
         # 2. 创建 JobRun 记录
         job_run = await self._create_job_run(
@@ -90,8 +97,12 @@ class AgentRunner:
         )
 
         try:
-            # 3. 生成执行计划
-            plan = await self._generate_plan(agent_dict, goal, context)
+            # 3. 生成执行计划或使用预设编排
+            workflow_steps = self._get_manual_workflow(agent_dict)
+            if workflow_steps:
+                plan = {"goal": goal, "steps": workflow_steps, "source": "workflow"}
+            else:
+                plan = await self._generate_plan(agent_dict, goal, context)
 
             # 更新 JobRun 的计划
             await self._update_job_run(job_run["id"], {
@@ -467,8 +478,10 @@ class AgentRunner:
             执行结果
         """
         prompt = step.get("prompt", step.get("description", ""))
-        provider = agent.get("default_provider") or "bailian"
-        model = agent.get("default_model") or "qwen-plus"
+        provider = agent.get("default_provider") or self.provider_manager.config.get("app", {}).get("default_provider", "bailian")
+        model = agent.get("default_model") or self.provider_manager.get_default_model(provider)
+        if not model:
+            model = "qwen-plus"
 
         messages = [
             {"role": "system", "content": agent["system_prompt"]},
@@ -476,12 +489,13 @@ class AgentRunner:
         ]
 
         response = await self.provider_manager.chat(
-            provider=provider,
-            model=model,
             messages=messages,
+            provider_name=provider,
+            model=model,
         )
-
-        return {"content": response.get("content", "")}
+        if not response:
+            return {"error": "模型调用失败"}
+        return {"content": response.content, "model": response.model}
 
     async def _execute_analysis_step(
         self,
@@ -535,8 +549,10 @@ class AgentRunner:
 
         summary_prompt += "\n\n请用简洁的语言总结任务完成情况,包括成功的部分和遇到的问题。"
 
-        provider = agent.get("default_provider") or "bailian"
-        model = agent.get("default_model") or "qwen-plus"
+        provider = agent.get("default_provider") or self.provider_manager.config.get("app", {}).get("default_provider", "bailian")
+        model = agent.get("default_model") or self.provider_manager.get_default_model(provider)
+        if not model:
+            model = "qwen-plus"
 
         messages = [
             {"role": "system", "content": "你是一个任务总结助手,擅长归纳和总结。"},
@@ -545,9 +561,9 @@ class AgentRunner:
 
         try:
             response = await self.provider_manager.chat(
-                provider=provider,
-                model=model,
                 messages=messages,
+                provider_name=provider,
+                model=model,
                 temperature=0.5,
             )
             return response.get("content", "执行完成")
@@ -556,6 +572,34 @@ class AgentRunner:
             success_count = sum(1 for r in results if r.get("status") == "success")
             total_count = len(results)
             return f"执行了 {total_count} 个步骤,其中 {success_count} 个成功。"
+
+    def _get_manual_workflow(self, agent: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """解析智能体预设的多步骤编排"""
+        workflow_cfg = agent.get("stop_condition")
+        if not isinstance(workflow_cfg, dict):
+            return []
+
+        raw_steps = workflow_cfg.get("workflow_steps") or []
+        normalized: List[Dict[str, Any]] = []
+
+        for idx, step in enumerate(raw_steps):
+            step_type = step.get("type", "analysis")
+            normalized_step: Dict[str, Any] = {
+                "index": idx,
+                "type": step_type,
+                "name": step.get("name", f"步骤 {idx + 1}"),
+                "description": step.get("description", ""),
+            }
+
+            if step_type == "tool" and step.get("tool"):
+                normalized_step["tool"] = step["tool"]
+                normalized_step["params"] = step.get("params", {})
+            elif step.get("prompt"):
+                normalized_step["prompt"] = step["prompt"]
+
+            normalized.append(normalized_step)
+
+        return normalized
 
     async def _create_job_run(
         self,

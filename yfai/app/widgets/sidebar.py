@@ -47,6 +47,7 @@ class SidebarWidget(QWidget):
             ("🔗 连接器", "connectors"),
             ("🤖 自动化", "automation"),
             ("📖 知识库", "knowledge"),
+            ("🧠 模型", "models"),
             ("🔧 工具", "tools"),
             ("📋 日志", "logs"),
             ("⚙️ 设置", "settings"),

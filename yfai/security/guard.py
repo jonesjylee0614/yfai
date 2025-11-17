@@ -73,6 +73,16 @@ class SecurityGuard:
         # 审批记录
         self.approval_history: list[ApprovalResult] = []
 
+    def apply_config(self, config: Dict[str, Any]) -> None:
+        """更新配置后同步内部参数"""
+
+        self.config = config
+        self.confirm_threshold = self._parse_threshold(
+            config.get("security", {}).get("confirm_threshold", "medium")
+        )
+        self.auto_audit = config.get("security", {}).get("auto_audit", True)
+        self.redact_config = config.get("security", {}).get("redact", {})
+
     def _parse_threshold(self, threshold: str) -> RiskLevel:
         """解析确认阈值
 

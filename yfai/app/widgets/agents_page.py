@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import uuid
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 
@@ -26,6 +27,7 @@ from PyQt6.QtWidgets import (
     QTableWidgetItem,
     QHeaderView,
     QTabWidget,
+    QFileDialog,
 )
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QFont
@@ -135,6 +137,14 @@ class AgentsPage(QWidget):
         edit_btn = QPushButton("✎ 编辑选中")
         edit_btn.clicked.connect(self._on_edit_agent)
         title_layout.addWidget(edit_btn)
+
+        import_btn = QPushButton("📥 导入")
+        import_btn.clicked.connect(self._import_agents)
+        title_layout.addWidget(import_btn)
+
+        export_btn = QPushButton("📤 导出")
+        export_btn.clicked.connect(self._export_agents)
+        title_layout.addWidget(export_btn)
 
         # 刷新按钮
         refresh_btn = QPushButton("🔄 刷新")
@@ -257,6 +267,149 @@ class AgentsPage(QWidget):
         dialog = AgentEditDialog(self.orchestrator, agent_id=self.current_agent_id, parent=self)
         if dialog.exec():
             self._load_agents()
+
+    def _export_agents(self):
+        """导出智能体配置"""
+        try:
+            with self.orchestrator.db_manager.get_session() as db_session:
+                from yfai.store.db import Agent
+
+                agents = db_session.query(Agent).all()
+                if not agents:
+                    QMessageBox.information(self, "提示", "没有可导出的智能体")
+                    return
+
+                # 选择保存路径
+                default_filename = f"yfai_agents_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+                file_path, _ = QFileDialog.getSaveFileName(
+                    self,
+                    "导出智能体配置",
+                    default_filename,
+                    "JSON文件 (*.json)"
+                )
+
+                if not file_path:
+                    return
+
+                # 准备导出数据（排除ID和时间戳等运行时数据）
+                export_data = []
+                for agent in agents:
+                    export_item = {
+                        "name": agent.name,
+                        "description": agent.description,
+                        "system_prompt": agent.system_prompt,
+                        "default_model": agent.default_model,
+                        "default_provider": agent.default_provider,
+                        "allowed_tools": json.loads(agent.allowed_tools) if agent.allowed_tools else [],
+                        "max_steps": agent.max_steps,
+                        "stop_condition": json.loads(agent.stop_condition) if agent.stop_condition else None,
+                        "is_enabled": agent.is_enabled,
+                        "risk_level": agent.risk_level,
+                        "tags": json.loads(agent.tags) if agent.tags else [],
+                    }
+                    export_data.append(export_item)
+
+                # 写入文件
+                with open(file_path, 'w', encoding='utf-8') as f:
+                    json.dump({
+                        "version": "1.0",
+                        "export_time": datetime.now().isoformat(),
+                        "agents": export_data
+                    }, f, ensure_ascii=False, indent=2)
+
+                QMessageBox.information(
+                    self,
+                    "成功",
+                    f"已成功导出 {len(export_data)} 个智能体配置到:\n{file_path}"
+                )
+        except Exception as e:
+            QMessageBox.critical(self, "失败", f"导出智能体配置失败: {e}")
+
+    def _import_agents(self):
+        """导入智能体配置"""
+        file_path, _ = QFileDialog.getOpenFileName(
+            self,
+            "导入智能体配置",
+            "",
+            "JSON文件 (*.json)"
+        )
+
+        if not file_path:
+            return
+
+        try:
+            # 读取文件
+            with open(file_path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+
+            # 验证格式
+            if not isinstance(data, dict) or "agents" not in data:
+                QMessageBox.warning(self, "错误", "文件格式不正确")
+                return
+
+            agents = data.get("agents", [])
+            if not agents:
+                QMessageBox.information(self, "提示", "文件中没有智能体配置")
+                return
+
+            # 导入智能体
+            imported_count = 0
+            skipped_count = 0
+            errors = []
+
+            with self.orchestrator.db_manager.get_session() as db_session:
+                from yfai.store.db import Agent
+
+                for agent_data in agents:
+                    try:
+                        # 检查是否已存在同名智能体
+                        existing = db_session.query(Agent).filter_by(
+                            name=agent_data.get("name")
+                        ).first()
+
+                        if existing:
+                            skipped_count += 1
+                            continue
+
+                        # 创建新智能体
+                        new_agent = Agent(
+                            id=str(uuid.uuid4()),
+                            name=agent_data.get("name", "未命名智能体"),
+                            description=agent_data.get("description"),
+                            system_prompt=agent_data.get("system_prompt", ""),
+                            default_model=agent_data.get("default_model"),
+                            default_provider=agent_data.get("default_provider", "bailian"),
+                            allowed_tools=json.dumps(agent_data.get("allowed_tools", DEFAULT_ALLOWED_TOOLS)),
+                            max_steps=agent_data.get("max_steps", 10),
+                            stop_condition=json.dumps(agent_data.get("stop_condition")) if agent_data.get("stop_condition") else None,
+                            is_enabled=agent_data.get("is_enabled", True),
+                            risk_level=agent_data.get("risk_level", "medium"),
+                            tags=json.dumps(agent_data.get("tags", [])) if agent_data.get("tags") else None,
+                            usage_count=0,
+                        )
+                        db_session.add(new_agent)
+                        imported_count += 1
+                    except Exception as e:
+                        errors.append(f"{agent_data.get('name', '未知')}: {str(e)}")
+
+                db_session.commit()
+
+            # 刷新列表
+            self._load_agents()
+
+            # 显示结果
+            result_msg = f"导入完成!\n\n成功: {imported_count} 个\n跳过: {skipped_count} 个（已存在同名智能体）"
+            if errors:
+                result_msg += f"\n失败: {len(errors)} 个\n\n错误详情:\n" + "\n".join(errors[:5])
+                if len(errors) > 5:
+                    result_msg += f"\n...还有 {len(errors) - 5} 个错误"
+
+            QMessageBox.information(self, "导入结果", result_msg)
+
+        except json.JSONDecodeError:
+            QMessageBox.critical(self, "错误", "文件不是有效的JSON格式")
+        except Exception as e:
+            QMessageBox.critical(self, "失败", f"导入智能体配置失败: {e}")
 
     def _on_run_agent(self):
         """运行智能体"""
@@ -841,3 +994,5 @@ class AgentEditDialog(QDialog):
             first_data = self.model_combo.currentData()
             if not first_data and self.model_combo.count() > 0:
                 self.model_combo.setCurrentIndex(0)
+
+

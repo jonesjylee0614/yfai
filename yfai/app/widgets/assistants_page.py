@@ -1,7 +1,9 @@
 """助手管理页面"""
 
+import json
 import uuid
 from datetime import datetime
+from pathlib import Path
 from typing import Dict, Optional
 
 from PyQt6.QtWidgets import (
@@ -20,6 +22,7 @@ from PyQt6.QtWidgets import (
     QComboBox,
     QCheckBox,
     QDialogButtonBox,
+    QFileDialog,
 )
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QColor
@@ -140,6 +143,14 @@ class AssistantsPage(QWidget):
         create_btn = QPushButton("➕ 创建助手")
         create_btn.clicked.connect(self._create_assistant)
         toolbar.addWidget(create_btn)
+
+        import_btn = QPushButton("📥 导入")
+        import_btn.clicked.connect(self._import_assistants)
+        toolbar.addWidget(import_btn)
+
+        export_btn = QPushButton("📤 导出")
+        export_btn.clicked.connect(self._export_assistants)
+        toolbar.addWidget(export_btn)
 
         refresh_btn = QPushButton("🔄 刷新")
         refresh_btn.clicked.connect(self._load_assistants)
@@ -325,3 +336,141 @@ class AssistantsPage(QWidget):
                 self._load_assistants()
             except Exception as e:
                 QMessageBox.critical(self, "错误", f"删除助手失败: {e}")
+
+    def _export_assistants(self):
+        """导出助手配置"""
+        if not self._assistants_cache:
+            QMessageBox.information(self, "提示", "没有可导出的助手")
+            return
+
+        # 选择保存路径
+        default_filename = f"yfai_assistants_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+        file_path, _ = QFileDialog.getSaveFileName(
+            self,
+            "导出助手配置",
+            default_filename,
+            "JSON文件 (*.json)"
+        )
+
+        if not file_path:
+            return
+
+        try:
+            # 准备导出数据（排除内置助手和运行时数据）
+            export_data = []
+            for assistant in self._assistants_cache.values():
+                if not assistant.get("is_builtin", False):
+                    # 只导出用户自定义助手，排除ID和时间戳等运行时数据
+                    export_item = {
+                        "name": assistant.get("name"),
+                        "role": assistant.get("role"),
+                        "description": assistant.get("description"),
+                        "system_prompt": assistant.get("system_prompt"),
+                        "provider": assistant.get("provider"),
+                        "model": assistant.get("model"),
+                        "tags": assistant.get("tags", []),
+                    }
+                    export_data.append(export_item)
+
+            if not export_data:
+                QMessageBox.information(self, "提示", "没有可导出的用户自定义助手\n（内置助手不会被导出）")
+                return
+
+            # 写入文件
+            with open(file_path, 'w', encoding='utf-8') as f:
+                json.dump({
+                    "version": "1.0",
+                    "export_time": datetime.now().isoformat(),
+                    "assistants": export_data
+                }, f, ensure_ascii=False, indent=2)
+
+            QMessageBox.information(
+                self,
+                "成功",
+                f"已成功导出 {len(export_data)} 个助手配置到:\n{file_path}"
+            )
+        except Exception as e:
+            QMessageBox.critical(self, "失败", f"导出助手配置失败: {e}")
+
+    def _import_assistants(self):
+        """导入助手配置"""
+        file_path, _ = QFileDialog.getOpenFileName(
+            self,
+            "导入助手配置",
+            "",
+            "JSON文件 (*.json)"
+        )
+
+        if not file_path:
+            return
+
+        try:
+            # 读取文件
+            with open(file_path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+
+            # 验证格式
+            if not isinstance(data, dict) or "assistants" not in data:
+                QMessageBox.warning(self, "错误", "文件格式不正确")
+                return
+
+            assistants = data.get("assistants", [])
+            if not assistants:
+                QMessageBox.information(self, "提示", "文件中没有助手配置")
+                return
+
+            # 导入助手
+            imported_count = 0
+            skipped_count = 0
+            errors = []
+
+            with self.orchestrator.db_manager.get_session() as db_session:
+                from yfai.store.db import Assistant
+
+                for assistant_data in assistants:
+                    try:
+                        # 检查是否已存在同名助手
+                        existing = db_session.query(Assistant).filter_by(
+                            name=assistant_data.get("name")
+                        ).first()
+
+                        if existing:
+                            skipped_count += 1
+                            continue
+
+                        # 创建新助手
+                        new_assistant = Assistant(
+                            id=str(uuid.uuid4()),
+                            name=assistant_data.get("name", "未命名助手"),
+                            role=assistant_data.get("role"),
+                            description=assistant_data.get("description"),
+                            system_prompt=assistant_data.get("system_prompt", ""),
+                            provider=assistant_data.get("provider", "bailian"),
+                            model=assistant_data.get("model"),
+                            tags=json.dumps(assistant_data.get("tags", [])) if assistant_data.get("tags") else None,
+                            is_builtin=False,
+                            usage_count=0,
+                        )
+                        db_session.add(new_assistant)
+                        imported_count += 1
+                    except Exception as e:
+                        errors.append(f"{assistant_data.get('name', '未知')}: {str(e)}")
+
+                db_session.commit()
+
+            # 刷新列表
+            self._load_assistants()
+
+            # 显示结果
+            result_msg = f"导入完成!\n\n成功: {imported_count} 个\n跳过: {skipped_count} 个（已存在同名助手）"
+            if errors:
+                result_msg += f"\n失败: {len(errors)} 个\n\n错误详情:\n" + "\n".join(errors[:5])
+                if len(errors) > 5:
+                    result_msg += f"\n...还有 {len(errors) - 5} 个错误"
+
+            QMessageBox.information(self, "导入结果", result_msg)
+
+        except json.JSONDecodeError:
+            QMessageBox.critical(self, "错误", "文件不是有效的JSON格式")
+        except Exception as e:
+            QMessageBox.critical(self, "失败", f"导入助手配置失败: {e}")

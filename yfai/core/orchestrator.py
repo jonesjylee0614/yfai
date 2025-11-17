@@ -500,11 +500,22 @@ class Orchestrator:
 
         # 网络操作
         elif tool_name == "net.http":
-            return await self.network_ops.http_request(**params)
+            result = await self.network_ops.http_request(**params)
+            # 持久化网络内容到审计日志
+            if result.get("success") and result.get("body"):
+                await self._persist_web_content(params.get("url", ""), result.get("body", ""), params)
+            return result
         elif tool_name == "net.check_port":
             return self.network_ops.check_port(**params)
         elif tool_name == "net.local_ip":
             return self.network_ops.get_local_ip()
+        elif tool_name == "net.search":
+            # 网络搜索（假设后续会添加）
+            result = await self._web_search(**params)
+            # 持久化搜索结果
+            if result.get("success") and result.get("results"):
+                await self._persist_search_results(params.get("query", ""), result.get("results", []))
+            return result
 
         else:
             return {"success": False, "error": f"未知工具: {tool_name}"}
@@ -632,4 +643,96 @@ class Orchestrator:
                 db_session.commit()
         except Exception as e:
             print(f"更新 Provider 使用统计失败: {e}")
+
+    async def _persist_web_content(
+        self,
+        url: str,
+        content: str,
+        params: Dict[str, Any],
+    ) -> None:
+        """持久化网络内容到审计日志
+
+        Args:
+            url: 网址
+            content: 网页内容
+            params: 请求参数
+        """
+        try:
+            import json
+            with self.db_manager.get_session() as db_session:
+                log = AuditLog(
+                    id=str(uuid.uuid4()),
+                    timestamp=datetime.utcnow(),
+                    action_type="web_fetch",
+                    tool_name="net.http",
+                    risk_level="low",
+                    request_data=json.dumps({
+                        "url": url,
+                        "method": params.get("method", "GET"),
+                        "headers": params.get("headers"),
+                    }, ensure_ascii=False),
+                    result_data=json.dumps({
+                        "url": url,
+                        "content_length": len(content),
+                        "content_preview": content[:500] if len(content) > 500 else content,
+                    }, ensure_ascii=False),
+                    session_id=self.current_session_id,
+                )
+                db_session.add(log)
+                db_session.commit()
+        except Exception as e:
+            print(f"持久化网络内容失败: {e}")
+
+    async def _persist_search_results(
+        self,
+        query: str,
+        results: List[Dict[str, Any]],
+    ) -> None:
+        """持久化搜索结果到审计日志
+
+        Args:
+            query: 搜索查询
+            results: 搜索结果列表
+        """
+        try:
+            import json
+            with self.db_manager.get_session() as db_session:
+                log = AuditLog(
+                    id=str(uuid.uuid4()),
+                    timestamp=datetime.utcnow(),
+                    action_type="web_search",
+                    tool_name="net.search",
+                    risk_level="low",
+                    request_data=json.dumps({
+                        "query": query,
+                    }, ensure_ascii=False),
+                    result_data=json.dumps({
+                        "query": query,
+                        "result_count": len(results),
+                        "results": results[:5],  # 只保存前5个结果
+                    }, ensure_ascii=False),
+                    session_id=self.current_session_id,
+                )
+                db_session.add(log)
+                db_session.commit()
+        except Exception as e:
+            print(f"持久化搜索结果失败: {e}")
+
+    async def _web_search(self, query: str, count: int = 5) -> Dict[str, Any]:
+        """执行网络搜索（占位实现）
+
+        Args:
+            query: 搜索查询
+            count: 返回结果数量
+
+        Returns:
+            搜索结果
+        """
+        # TODO: 实现实际的搜索功能（集成搜索 API）
+        return {
+            "success": True,
+            "query": query,
+            "results": [],
+            "message": "搜索功能待实现，请配置搜索 API",
+        }
 

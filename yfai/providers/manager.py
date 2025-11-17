@@ -130,29 +130,106 @@ class ProviderManager:
         """
         resolved_name, provider = self._resolve_provider(provider_name)
         if not provider:
-            print(f"Provider {provider_name} 不存在")
+            error_msg = self._get_provider_error_message(provider_name)
+            print(error_msg)
             return None
 
+        # 尝试主 Provider
         try:
             response = await provider.chat(messages, **kwargs)
             if response:
                 response.provider = resolved_name
+                self.health_status[resolved_name] = True
             return response
         except Exception as e:
-            print(f"Provider {resolved_name} 调用失败: {e}")
+            error_detail = self._format_error_message(resolved_name, e)
+            print(f"❌ {error_detail}")
+            self.health_status[resolved_name] = False
 
-            # 尝试降级
-            if resolved_name != "ollama" and "ollama" in self.providers:
-                print("尝试降级到Ollama...")
+            # 智能降级策略
+            fallback_providers = self._get_fallback_providers(resolved_name)
+            for fallback_name in fallback_providers:
+                if fallback_name not in self.providers:
+                    continue
+
+                print(f"🔄 尝试降级到 {fallback_name}...")
                 try:
-                    response = await self.providers["ollama"].chat(messages, **kwargs)
+                    fallback_provider = self.providers[fallback_name]
+                    response = await fallback_provider.chat(messages, **kwargs)
                     if response:
-                        response.provider = "ollama"
-                    return response
+                        response.provider = fallback_name
+                        self.health_status[fallback_name] = True
+                        print(f"✅ 降级成功，使用 {fallback_name}")
+                        return response
                 except Exception as e2:
-                    print(f"降级失败: {e2}")
+                    error_detail = self._format_error_message(fallback_name, e2)
+                    print(f"❌ 降级到 {fallback_name} 失败: {error_detail}")
+                    self.health_status[fallback_name] = False
 
+            print("⚠️ 所有 Provider 均不可用，请检查配置和网络连接")
             return None
+
+    def _get_provider_error_message(self, provider_name: Optional[str]) -> str:
+        """获取 Provider 不存在的友好错误消息
+
+        Args:
+            provider_name: Provider 名称
+
+        Returns:
+            错误消息
+        """
+        if not provider_name:
+            return "❌ 未指定 Provider，且未配置默认 Provider"
+
+        available = list(self.providers.keys())
+        if available:
+            return f"❌ Provider '{provider_name}' 不存在。可用的 Provider: {', '.join(available)}"
+        else:
+            return "❌ 未配置任何 Provider，请检查配置文件"
+
+    def _format_error_message(self, provider_name: str, error: Exception) -> str:
+        """格式化错误消息
+
+        Args:
+            provider_name: Provider 名称
+            error: 异常对象
+
+        Returns:
+            格式化的错误消息
+        """
+        error_type = type(error).__name__
+        error_msg = str(error)
+
+        # 常见错误的友好提示
+        if "Connection" in error_type or "connection" in error_msg.lower():
+            return f"Provider '{provider_name}' 连接失败: 请检查网络连接和 API 地址配置"
+        elif "timeout" in error_msg.lower():
+            return f"Provider '{provider_name}' 请求超时: 请检查网络状况或增加超时时间"
+        elif "401" in error_msg or "authentication" in error_msg.lower():
+            return f"Provider '{provider_name}' 认证失败: 请检查 API Key 配置"
+        elif "429" in error_msg or "rate limit" in error_msg.lower():
+            return f"Provider '{provider_name}' 请求频率超限: 请稍后重试"
+        elif "404" in error_msg:
+            return f"Provider '{provider_name}' API 端点不存在: 请检查 API Base 配置"
+        else:
+            return f"Provider '{provider_name}' 调用失败 ({error_type}): {error_msg[:100]}"
+
+    def _get_fallback_providers(self, current_provider: str) -> List[str]:
+        """获取降级 Provider 列表
+
+        Args:
+            current_provider: 当前 Provider 名称
+
+        Returns:
+            降级 Provider 名称列表
+        """
+        # 降级优先级: bailian -> ollama, ollama -> bailian
+        fallback_map = {
+            "bailian": ["ollama"],
+            "ollama": ["bailian"],
+        }
+
+        return fallback_map.get(current_provider, [])
 
     async def list_all_models(self) -> Dict[str, List[str]]:
         """列出所有Provider的可用模型

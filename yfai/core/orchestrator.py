@@ -11,7 +11,8 @@ from ..providers import ChatMessage, ChatResponse, ProviderManager
 from ..mcp import McpClient, McpRegistry
 from ..localops import FileSystemOps, ShellOps, ProcessOps, NetworkOps
 from ..security import SecurityGuard, SecurityPolicy, ApprovalRequest, ApprovalResult, RiskLevel
-from ..store import Assistant, DatabaseManager, Message, Session, ToolCall
+from ..store import Assistant, DatabaseManager, Message, Session, ToolCall, ProviderStatus
+from ..search import SearchManager
 from .agent_runner import AgentRunner
 
 
@@ -26,6 +27,7 @@ class Orchestrator:
         self.mcp_registry = McpRegistry()
         self.security_guard = SecurityGuard(config)
         self.security_policy = SecurityPolicy(config)
+        self.search_manager = SearchManager(config)
 
         # 初始化数据库
         db_path = config.get("database", {}).get("path", "data/yfai.db")
@@ -174,6 +176,14 @@ class Orchestrator:
         if response:
             provider_used = response.provider or requested_provider
             model_used = response.model or requested_model
+
+            # 更新 Provider 使用统计
+            await self._update_provider_usage(
+                provider_name=provider_used,
+                model_name=model_used,
+                success=True,
+            )
+
             # 保存助手消息
             assistant_msg_id = str(uuid.uuid4())
             with self.db_manager.get_session() as db_session:
@@ -187,6 +197,14 @@ class Orchestrator:
                 )
                 db_session.add(message)
                 db_session.commit()
+        else:
+            # 记录失败
+            await self._update_provider_usage(
+                provider_name=requested_provider,
+                model_name=requested_model,
+                success=False,
+                error="Provider 返回空响应",
+            )
 
         return response
 
@@ -265,6 +283,13 @@ class Orchestrator:
             )
             db_session.add(message)
             db_session.commit()
+
+        # 更新 Provider 使用统计
+        await self._update_provider_usage(
+            provider_name=provider_used,
+            model_name=resolved_model,
+            success=True,
+        )
 
     async def _get_session_messages(self, session_id: str) -> List[ChatMessage]:
         """获取会话消息历史
@@ -477,11 +502,22 @@ class Orchestrator:
 
         # 网络操作
         elif tool_name == "net.http":
-            return await self.network_ops.http_request(**params)
+            result = await self.network_ops.http_request(**params)
+            # 持久化网络内容到审计日志
+            if result.get("success") and result.get("body"):
+                await self._persist_web_content(params.get("url", ""), result.get("body", ""), params)
+            return result
         elif tool_name == "net.check_port":
             return self.network_ops.check_port(**params)
         elif tool_name == "net.local_ip":
             return self.network_ops.get_local_ip()
+        elif tool_name == "net.search":
+            # 网络搜索（假设后续会添加）
+            result = await self._web_search(**params)
+            # 持久化搜索结果
+            if result.get("success") and result.get("results"):
+                await self._persist_search_results(params.get("query", ""), result.get("results", []))
+            return result
 
         else:
             return {"success": False, "error": f"未知工具: {tool_name}"}
@@ -524,9 +560,204 @@ class Orchestrator:
         """
         provider_health = await self.provider_manager.check_health_all()
 
+        # 将健康状态写入数据库
+        await self._update_provider_health_status(provider_health)
+
         return {
             "providers": provider_health,
             "database": self.db_manager is not None,
             "mcp_servers": self.mcp_registry.get_stats(),
         }
+
+    async def _update_provider_health_status(self, health_status: Dict[str, bool]) -> None:
+        """更新 Provider 健康状态到数据库
+
+        Args:
+            health_status: Provider 健康状态字典
+        """
+        try:
+            with self.db_manager.get_session() as db_session:
+                for provider_name, is_healthy in health_status.items():
+                    status = db_session.query(ProviderStatus).filter_by(
+                        provider_name=provider_name
+                    ).first()
+
+                    if status:
+                        status.is_healthy = is_healthy
+                        status.last_check_at = datetime.utcnow()
+                        if not is_healthy:
+                            status.error_message = "健康检查失败"
+                        else:
+                            status.error_message = None
+                    else:
+                        status = ProviderStatus(
+                            provider_name=provider_name,
+                            is_healthy=is_healthy,
+                            last_check_at=datetime.utcnow(),
+                            error_message="健康检查失败" if not is_healthy else None,
+                        )
+                        db_session.add(status)
+
+                db_session.commit()
+        except Exception as e:
+            print(f"更新 Provider 健康状态失败: {e}")
+
+    async def _update_provider_usage(
+        self,
+        provider_name: str,
+        model_name: Optional[str] = None,
+        success: bool = True,
+        error: Optional[str] = None,
+    ) -> None:
+        """更新 Provider 使用统计
+
+        Args:
+            provider_name: Provider 名称
+            model_name: 模型名称
+            success: 是否成功
+            error: 错误信息
+        """
+        try:
+            with self.db_manager.get_session() as db_session:
+                status = db_session.query(ProviderStatus).filter_by(
+                    provider_name=provider_name
+                ).first()
+
+                if status:
+                    status.total_requests += 1
+                    if not success:
+                        status.failed_requests += 1
+                        status.error_message = error
+                    status.last_used_at = datetime.utcnow()
+                    if model_name:
+                        status.current_model = model_name
+                else:
+                    status = ProviderStatus(
+                        provider_name=provider_name,
+                        total_requests=1,
+                        failed_requests=0 if success else 1,
+                        last_used_at=datetime.utcnow(),
+                        current_model=model_name,
+                        error_message=error if not success else None,
+                    )
+                    db_session.add(status)
+
+                db_session.commit()
+        except Exception as e:
+            print(f"更新 Provider 使用统计失败: {e}")
+
+    async def _persist_web_content(
+        self,
+        url: str,
+        content: str,
+        params: Dict[str, Any],
+    ) -> None:
+        """持久化网络内容到审计日志
+
+        Args:
+            url: 网址
+            content: 网页内容
+            params: 请求参数
+        """
+        try:
+            import json
+            with self.db_manager.get_session() as db_session:
+                log = AuditLog(
+                    id=str(uuid.uuid4()),
+                    timestamp=datetime.utcnow(),
+                    action_type="web_fetch",
+                    tool_name="net.http",
+                    risk_level="low",
+                    request_data=json.dumps({
+                        "url": url,
+                        "method": params.get("method", "GET"),
+                        "headers": params.get("headers"),
+                    }, ensure_ascii=False),
+                    result_data=json.dumps({
+                        "url": url,
+                        "content_length": len(content),
+                        "content_preview": content[:500] if len(content) > 500 else content,
+                    }, ensure_ascii=False),
+                    session_id=self.current_session_id,
+                )
+                db_session.add(log)
+                db_session.commit()
+        except Exception as e:
+            print(f"持久化网络内容失败: {e}")
+
+    async def _persist_search_results(
+        self,
+        query: str,
+        results: List[Dict[str, Any]],
+    ) -> None:
+        """持久化搜索结果到审计日志
+
+        Args:
+            query: 搜索查询
+            results: 搜索结果列表
+        """
+        try:
+            import json
+            with self.db_manager.get_session() as db_session:
+                log = AuditLog(
+                    id=str(uuid.uuid4()),
+                    timestamp=datetime.utcnow(),
+                    action_type="web_search",
+                    tool_name="net.search",
+                    risk_level="low",
+                    request_data=json.dumps({
+                        "query": query,
+                    }, ensure_ascii=False),
+                    result_data=json.dumps({
+                        "query": query,
+                        "result_count": len(results),
+                        "results": results[:5],  # 只保存前5个结果
+                    }, ensure_ascii=False),
+                    session_id=self.current_session_id,
+                )
+                db_session.add(log)
+                db_session.commit()
+        except Exception as e:
+            print(f"持久化搜索结果失败: {e}")
+
+    async def _web_search(self, query: str, count: int = 5, engine: Optional[str] = None) -> Dict[str, Any]:
+        """执行网络搜索
+
+        Args:
+            query: 搜索查询
+            count: 返回结果数量
+            engine: 指定搜索引擎
+
+        Returns:
+            搜索结果
+        """
+        try:
+            results = await self.search_manager.search(
+                query=query,
+                max_results=count,
+                engine=engine,
+            )
+
+            if not results:
+                return {
+                    "success": False,
+                    "query": query,
+                    "results": [],
+                    "message": "未找到搜索结果或搜索引擎不可用",
+                }
+
+            return {
+                "success": True,
+                "query": query,
+                "count": len(results),
+                "results": [result.to_dict() for result in results],
+            }
+
+        except Exception as e:
+            return {
+                "success": False,
+                "query": query,
+                "results": [],
+                "error": str(e),
+            }
 

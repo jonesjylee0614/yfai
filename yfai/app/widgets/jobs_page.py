@@ -222,9 +222,16 @@ class JobDetailsDialog(QDialog):
         layout.addWidget(steps_label)
 
         self.steps_table = QTableWidget()
-        self.steps_table.setColumnCount(5)
-        self.steps_table.setHorizontalHeaderLabels(["索引", "类型", "名称", "状态", "耗时(ms)"])
-        self.steps_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.steps_table.setColumnCount(7)
+        self.steps_table.setHorizontalHeaderLabels(["索引", "类型", "名称", "模型/工具", "Provider", "状态", "耗时(ms)"])
+        header = self.steps_table.horizontalHeader()
+        header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
+        header.setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
+        header.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
+        header.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
+        header.setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)
+        header.setSectionResizeMode(5, QHeaderView.ResizeMode.ResizeToContents)
+        header.setSectionResizeMode(6, QHeaderView.ResizeMode.ResizeToContents)
         self.steps_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         layout.addWidget(self.steps_table)
 
@@ -278,9 +285,26 @@ class JobDetailsDialog(QDialog):
                     self.steps_table.setItem(row, 0, QTableWidgetItem(str(step.step_index)))
                     self.steps_table.setItem(row, 1, QTableWidgetItem(step.step_type))
                     self.steps_table.setItem(row, 2, QTableWidgetItem(step.step_name))
-                    self.steps_table.setItem(row, 3, QTableWidgetItem(step.status))
+
+                    # 从 request_snapshot 中提取模型/工具信息
+                    model_tool = "-"
+                    provider = "-"
+                    if step.request_snapshot:
+                        try:
+                            snapshot = json.loads(step.request_snapshot) if isinstance(step.request_snapshot, str) else step.request_snapshot
+                            if step.step_type == "model":
+                                model_tool = snapshot.get("model", "-")
+                                provider = snapshot.get("provider", "-")
+                            elif step.step_type == "tool":
+                                model_tool = snapshot.get("tool_name", step.step_name)
+                        except:
+                            pass
+
+                    self.steps_table.setItem(row, 3, QTableWidgetItem(model_tool))
+                    self.steps_table.setItem(row, 4, QTableWidgetItem(provider))
+                    self.steps_table.setItem(row, 5, QTableWidgetItem(step.status))
                     self.steps_table.setItem(
-                        row, 4, QTableWidgetItem(str(step.duration_ms) if step.duration_ms else "-")
+                        row, 6, QTableWidgetItem(str(step.duration_ms) if step.duration_ms else "-")
                     )
 
         except Exception as e:

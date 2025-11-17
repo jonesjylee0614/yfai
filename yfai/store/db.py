@@ -247,6 +247,39 @@ class KVStore(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
+class ProviderStatus(Base):
+    """Provider 状态表"""
+
+    __tablename__ = "provider_status"
+
+    provider_name = Column(String(50), primary_key=True)
+    is_healthy = Column(Boolean, default=False)
+    last_check_at = Column(DateTime, default=datetime.utcnow)
+    last_used_at = Column(DateTime, nullable=True)
+    current_model = Column(String(100), nullable=True)
+    total_requests = Column(Integer, default=0)
+    failed_requests = Column(Integer, default=0)
+    error_message = Column(Text, nullable=True)
+    metadata = Column(Text, nullable=True)  # JSON: 额外状态信息
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "provider_name": self.provider_name,
+            "is_healthy": self.is_healthy,
+            "last_check_at": self.last_check_at.isoformat() if self.last_check_at else None,
+            "last_used_at": self.last_used_at.isoformat() if self.last_used_at else None,
+            "current_model": self.current_model,
+            "total_requests": self.total_requests,
+            "failed_requests": self.failed_requests,
+            "error_message": self.error_message,
+            "metadata": json.loads(self.metadata) if self.metadata else {},
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+        }
+
+
 class Agent(Base):
     """智能体配置表"""
 

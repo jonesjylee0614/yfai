@@ -34,6 +34,7 @@ from .widgets.knowledge_page import KnowledgeBasePage
 from .widgets.sessions_page import SessionsPage
 from .widgets.assistants_page import AssistantsPage
 from .widgets.logs_page import LogsPage
+from .widgets.approvals_page import ApprovalsPage
 from .widgets.approval_dialog import ApprovalDialog
 
 from yfai.security.guard import ApprovalRequest, ApprovalResult, ApprovalStatus
@@ -94,6 +95,7 @@ class MainWindow(QMainWindow):
         self.sessions_page = SessionsPage(self.orchestrator)
         self.assistants_page = AssistantsPage(self.orchestrator)
         self.logs_page = LogsPage(self.orchestrator)
+        self.approvals_page = ApprovalsPage(self.orchestrator)
 
         # 系统类页面
         self.models_page = ModelsPage(self.orchestrator, self.config_manager)
@@ -111,6 +113,7 @@ class MainWindow(QMainWindow):
             "sessions": self.sessions_page,
             "assistants": self.assistants_page,
             "logs": self.logs_page,
+            "approvals": self.approvals_page,
             "models": self.models_page,
             "tools": self.tools_page,
             "settings": self.settings_page,
@@ -220,6 +223,16 @@ class MainWindow(QMainWindow):
 
         toolbar.addSeparator()
 
+        # 模式指示器
+        self.mode_indicator = QLabel("模式: 手动")
+        self.mode_indicator.setStyleSheet(
+            "padding: 4px 8px; border: 1px solid #ccc; border-radius: 3px; background: #f5f5f5;"
+        )
+        self.mode_indicator.setToolTip("当前 Provider 选择模式")
+        toolbar.addWidget(self.mode_indicator)
+
+        toolbar.addSeparator()
+
         toolbar.addWidget(QLabel("助手:"))
         self.assistant_combo = QComboBox()
         self.assistant_combo.addItem("未选择", "")
@@ -259,6 +272,7 @@ class MainWindow(QMainWindow):
         self._populate_model_combo(self.chat_widget.current_provider or default_provider)
         self._populate_assistant_combo()
         self._update_model_badge()
+        self._update_mode_indicator()
 
     def _toggle_tools_panel(self, checked: bool) -> None:
         """切换工具面板显示"""
@@ -298,6 +312,7 @@ class MainWindow(QMainWindow):
         provider_key = self.chat_widget.current_provider or self.config.get("app", {}).get("default_provider", "bailian")
         self._populate_model_combo(provider_key)
         self._update_model_badge()
+        self._update_mode_indicator()
         self._persist_toolbar_selection()
 
     def _on_model_changed(self, *args) -> None:
@@ -443,6 +458,42 @@ class MainWindow(QMainWindow):
         provider_label = self.provider_combo.currentText()
         model_text = self.chat_widget.current_model or self.model_combo.currentText().strip()
         self.chat_widget.set_active_model(provider_label, model_text)
+
+    def _update_mode_indicator(self) -> None:
+        """更新模式指示器"""
+        if not hasattr(self, "mode_indicator"):
+            return
+
+        provider_text = self.provider_combo.currentText()
+
+        if provider_text == "自动":
+            # 检查是否配置了路由规则
+            model_route = self.config.get("app", {}).get("model_route", {})
+            if model_route:
+                route_count = len(model_route)
+                self.mode_indicator.setText(f"模式: 路由 ({route_count}规则)")
+                self.mode_indicator.setStyleSheet(
+                    "padding: 4px 8px; border: 1px solid #3498db; border-radius: 3px; "
+                    "background: #e3f2fd; color: #1976d2; font-weight: bold;"
+                )
+                tooltip_lines = ["路由规则:"]
+                for task_type, route in model_route.items():
+                    tooltip_lines.append(f"  {task_type}: {route}")
+                self.mode_indicator.setToolTip("\n".join(tooltip_lines))
+            else:
+                self.mode_indicator.setText("模式: 自动")
+                self.mode_indicator.setStyleSheet(
+                    "padding: 4px 8px; border: 1px solid #2ecc71; border-radius: 3px; "
+                    "background: #e8f8f5; color: #27ae60; font-weight: bold;"
+                )
+                self.mode_indicator.setToolTip("自动选择可用的 Provider")
+        else:
+            self.mode_indicator.setText("模式: 手动")
+            self.mode_indicator.setStyleSheet(
+                "padding: 4px 8px; border: 1px solid #95a5a6; border-radius: 3px; "
+                "background: #ecf0f1; color: #7f8c8d;"
+            )
+            self.mode_indicator.setToolTip(f"手动指定: {provider_text}")
 
     def _on_session_resume(self, session_id: str) -> None:
         """从会话列表恢复对话"""
@@ -598,6 +649,7 @@ class MainWindow(QMainWindow):
                 "sessions": "会话管理",
                 "assistants": "助手管理",
                 "logs": "日志查看",
+                "approvals": "审批管理",
                 "models": "模型管理",
                 "tools": "工具管理",
                 "settings": "系统设置",
@@ -671,6 +723,7 @@ class MainWindow(QMainWindow):
         # 更新Orchestrator依赖
         self.orchestrator.update_config(new_config)
         self._load_settings()
+        self._update_mode_indicator()
 
     def _populate_model_combo(self, provider_key: Optional[str]) -> None:
         """根据Provider刷新模型下拉"""

@@ -50,6 +50,7 @@ class SidebarWidget(QWidget):
             ("🧠 模型", "models"),
             ("🔧 工具", "tools"),
             ("📋 日志", "logs"),
+            ("🔐 审批", "approvals"),
             ("⚙️ 设置", "settings"),
         ]
 

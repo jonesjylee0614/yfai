@@ -1,6 +1,6 @@
 """数据存储模块"""
 
-from .db import DatabaseManager, Session, Message, ToolCall, Assistant, KnowledgeBase
+from .db import DatabaseManager, Session, Message, ToolCall, Assistant, KnowledgeBase, ProviderStatus
 from .indexer import VectorIndexer
 
 __all__ = [
@@ -10,6 +10,7 @@ __all__ = [
     "ToolCall",
     "Assistant",
     "KnowledgeBase",
+    "ProviderStatus",
     "VectorIndexer",
 ]
 

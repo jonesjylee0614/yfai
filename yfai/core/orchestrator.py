@@ -11,7 +11,7 @@ from ..providers import ChatMessage, ChatResponse, ProviderManager
 from ..mcp import McpClient, McpRegistry
 from ..localops import FileSystemOps, ShellOps, ProcessOps, NetworkOps
 from ..security import SecurityGuard, SecurityPolicy, ApprovalRequest, ApprovalResult, RiskLevel
-from ..store import Assistant, DatabaseManager, Message, Session, ToolCall
+from ..store import Assistant, DatabaseManager, Message, Session, ToolCall, ProviderStatus
 from .agent_runner import AgentRunner
 
 
@@ -174,6 +174,14 @@ class Orchestrator:
         if response:
             provider_used = response.provider or requested_provider
             model_used = response.model or requested_model
+
+            # 更新 Provider 使用统计
+            await self._update_provider_usage(
+                provider_name=provider_used,
+                model_name=model_used,
+                success=True,
+            )
+
             # 保存助手消息
             assistant_msg_id = str(uuid.uuid4())
             with self.db_manager.get_session() as db_session:
@@ -187,6 +195,14 @@ class Orchestrator:
                 )
                 db_session.add(message)
                 db_session.commit()
+        else:
+            # 记录失败
+            await self._update_provider_usage(
+                provider_name=requested_provider,
+                model_name=requested_model,
+                success=False,
+                error="Provider 返回空响应",
+            )
 
         return response
 
@@ -265,6 +281,13 @@ class Orchestrator:
             )
             db_session.add(message)
             db_session.commit()
+
+        # 更新 Provider 使用统计
+        await self._update_provider_usage(
+            provider_name=provider_used,
+            model_name=resolved_model,
+            success=True,
+        )
 
     async def _get_session_messages(self, session_id: str) -> List[ChatMessage]:
         """获取会话消息历史
@@ -524,9 +547,89 @@ class Orchestrator:
         """
         provider_health = await self.provider_manager.check_health_all()
 
+        # 将健康状态写入数据库
+        await self._update_provider_health_status(provider_health)
+
         return {
             "providers": provider_health,
             "database": self.db_manager is not None,
             "mcp_servers": self.mcp_registry.get_stats(),
         }
+
+    async def _update_provider_health_status(self, health_status: Dict[str, bool]) -> None:
+        """更新 Provider 健康状态到数据库
+
+        Args:
+            health_status: Provider 健康状态字典
+        """
+        try:
+            with self.db_manager.get_session() as db_session:
+                for provider_name, is_healthy in health_status.items():
+                    status = db_session.query(ProviderStatus).filter_by(
+                        provider_name=provider_name
+                    ).first()
+
+                    if status:
+                        status.is_healthy = is_healthy
+                        status.last_check_at = datetime.utcnow()
+                        if not is_healthy:
+                            status.error_message = "健康检查失败"
+                        else:
+                            status.error_message = None
+                    else:
+                        status = ProviderStatus(
+                            provider_name=provider_name,
+                            is_healthy=is_healthy,
+                            last_check_at=datetime.utcnow(),
+                            error_message="健康检查失败" if not is_healthy else None,
+                        )
+                        db_session.add(status)
+
+                db_session.commit()
+        except Exception as e:
+            print(f"更新 Provider 健康状态失败: {e}")
+
+    async def _update_provider_usage(
+        self,
+        provider_name: str,
+        model_name: Optional[str] = None,
+        success: bool = True,
+        error: Optional[str] = None,
+    ) -> None:
+        """更新 Provider 使用统计
+
+        Args:
+            provider_name: Provider 名称
+            model_name: 模型名称
+            success: 是否成功
+            error: 错误信息
+        """
+        try:
+            with self.db_manager.get_session() as db_session:
+                status = db_session.query(ProviderStatus).filter_by(
+                    provider_name=provider_name
+                ).first()
+
+                if status:
+                    status.total_requests += 1
+                    if not success:
+                        status.failed_requests += 1
+                        status.error_message = error
+                    status.last_used_at = datetime.utcnow()
+                    if model_name:
+                        status.current_model = model_name
+                else:
+                    status = ProviderStatus(
+                        provider_name=provider_name,
+                        total_requests=1,
+                        failed_requests=0 if success else 1,
+                        last_used_at=datetime.utcnow(),
+                        current_model=model_name,
+                        error_message=error if not success else None,
+                    )
+                    db_session.add(status)
+
+                db_session.commit()
+        except Exception as e:
+            print(f"更新 Provider 使用统计失败: {e}")
 

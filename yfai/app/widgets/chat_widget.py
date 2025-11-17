@@ -159,24 +159,32 @@ class ChatWidget(QWidget):
 
     def eventFilter(self, obj, event):
         """事件过滤器"""
-        if obj == self.input_text:
-            from PyQt6.QtCore import QEvent
-            from PyQt6.QtGui import QKeyEvent
+        import logging
 
-            if event.type() == QEvent.Type.KeyPress:
-                key_event: QKeyEvent = event
-                if (
-                    key_event.key() == Qt.Key.Key_Return
-                    and not key_event.modifiers() & Qt.KeyboardModifier.ShiftModifier
-                ):
-                    self._on_send_clicked()
-                    return True
+        try:
+            if obj == self.input_text:
+                from PyQt6.QtCore import QEvent
+                from PyQt6.QtGui import QKeyEvent
+
+                if event.type() == QEvent.Type.KeyPress:
+                    key_event: QKeyEvent = event
+                    if (
+                        key_event.key() == Qt.Key.Key_Return
+                        and not key_event.modifiers() & Qt.KeyboardModifier.ShiftModifier
+                    ):
+                        self._on_send_clicked()
+                        return True
+        except Exception as e:
+            logging.error(f"事件过滤器异常: {e}", exc_info=True)
 
         return super().eventFilter(obj, event)
 
     def new_session(self):
         """新建会话"""
+        import logging
+
         async def create():
+<<<<<<< HEAD
             title = "新对话"
             if self.current_assistant_name:
                 title = f"{self.current_assistant_name} 对话"
@@ -190,8 +198,29 @@ class ChatWidget(QWidget):
                 self.status_changed.emit("新建会话成功")
 
             self._reset_messages()
+=======
+            try:
+                self.current_session_id = await self.orchestrator.create_session()
+                self.status_changed.emit("新建会话成功")
 
-        asyncio.create_task(create())
+                # 清空消息显示
+                while self.messages_layout.count() > 1:
+                    item = self.messages_layout.takeAt(0)
+                    if item.widget():
+                        item.widget().deleteLater()
+            except Exception as e:
+                logging.error(f"创建会话失败: {e}", exc_info=True)
+                self.status_changed.emit(f"创建会话失败: {e}")
+>>>>>>> 1467cb64e794fe9aa63e6a0b5ac4c373a2c8b1da
+
+        # 创建任务并处理可能的异常
+        task = asyncio.create_task(create())
+
+        def handle_exception(t):
+            if t.exception():
+                logging.error(f"异步任务失败: {t.exception()}")
+
+        task.add_done_callback(handle_exception)
 
     def _on_send_clicked(self):
         """发送按钮点击"""
@@ -210,6 +239,9 @@ class ChatWidget(QWidget):
         self.status_changed.emit("正在发送...")
 
         async def send():
+            import logging
+
+            assistant_label = None
             try:
                 # 流式接收
                 assistant_bubble = MessageBubble("assistant", "")
@@ -217,6 +249,13 @@ class ChatWidget(QWidget):
                 self.messages_layout.insertWidget(
                     self.messages_layout.count() - 1, assistant_bubble
                 )
+
+                # 查找标签并验证
+                assistant_label = assistant_bubble.findChild(QLabel)
+                if not assistant_label:
+                    logging.error("无法找到消息气泡中的QLabel")
+                    self.status_changed.emit("界面错误：无法创建消息气泡")
+                    return
 
                 full_response = ""
                 web_context = None
@@ -233,7 +272,8 @@ class ChatWidget(QWidget):
                 ):
                     full_response += chunk
                     # 更新气泡内容
-                    assistant_bubble.findChild(QLabel).setText(full_response)
+                    if assistant_label:
+                        assistant_label.setText(full_response)
 
                 meta = await self.orchestrator.get_last_assistant_metadata(self.current_session_id)
                 if meta:
@@ -246,14 +286,34 @@ class ChatWidget(QWidget):
                     )
                 self.status_changed.emit("发送完成")
 
+            except asyncio.CancelledError:
+                logging.info("聊天被取消")
+                if assistant_label:
+                    assistant_label.setText(
+                        assistant_label.text() + "\n[已取消]"
+                    )
             except Exception as e:
+                logging.error(f"发送消息失败: {e}", exc_info=True)
                 self.status_changed.emit(f"发送失败: {e}")
-                self._add_message("assistant", f"错误: {e}")
+                if assistant_label:
+                    assistant_label.setText(
+                        assistant_label.text() + f"\n[错误: {e}]"
+                    )
+                else:
+                    self._add_message("assistant", f"错误: {e}")
 
             finally:
                 self.send_btn.setEnabled(True)
 
-        asyncio.create_task(send())
+        # 创建任务并处理可能的异常
+        task = asyncio.create_task(send())
+
+        def handle_exception(t):
+            if t.exception():
+                import logging
+                logging.error(f"发送任务异常: {t.exception()}")
+
+        task.add_done_callback(handle_exception)
 
     def _add_message(self, role: str, content: str):
         """添加消息到UI"""

@@ -1,0 +1,36 @@
+文件,行号,函数,问题类型,严重性,问题简述,影响范围,修复方案
+orchestrator.py,75-83,create_session,异常处理,高,commit() 失败时无异常处理,会话创建,添加 try-catch 和 rollback
+orchestrator.py,156-220,stream_chat,数据一致性,高,流式聊天数据丢失风险,消息历史,添加本地缓存或保存点
+orchestrator.py,139-154,chat,空值检查,高,response 为 None 时访问 content,消息保存,使用 response is not None 检查
+orchestrator.py,132-137,chat,异常处理,高,provider chat() 无异常处理,整个函数,添加 try-catch
+orchestrator.py,274,execute_tool,数据格式,中,params 转为字符串而非 JSON,工具调用记录,改用 json.dumps()
+orchestrator.py,321-333,execute_tool,状态管理,中,工具状态更新不安全,工具执行历史,添加日志和原始值检查
+agent_runner.py,70-81,run_agent,原子性,中,agent 统计信息更新不原子,Agent 统计,使用数据库 UPDATE 语句
+agent_runner.py,220-248,_generate_plan,错误处理,中,JSON 解析失败后丢失原始响应,计划生成,记录原始响应和错误
+agent_runner.py,389,_execute_tool_step,异步回调,高,同步调用异步函数的回调,工具执行审批,检查回调是否是 coroutine
+agent_runner.py,288-295,_execute_step,空值检查,高,result 为 None 时调用 get(),步骤执行,检查 result is not None
+agent_runner.py,286-339,_execute_step,状态更新,高,异常时 JobRun status 不更新为 failed,JobRun 状态,在 except 块中更新 status
+agent_runner.py,478-484,_execute_model_step,异常处理,高,response 为 None 时崩溃,模型步骤执行,检查 response is not None
+agent_runner.py,546-558,_generate_summary,异常处理,中,总结生成的异常处理不完整,总结生成,添加更详细的异常处理
+guard.py,152-179,request_approval,异步回调,高,同步调用异步回调函数,审批流程,使用 inspect.iscoroutine() 检查
+guard.py,188,_audit_log,日志,高,审计日志未实现只打印,审计追踪,实现数据库持久化
+guard.py,213-223,redact_sensitive_info,脱敏,中,脱敏逻辑简陋,安全脱敏,使用正则表达式
+bailian.py,81-91,chat,数组越界,高,choices[0] 未检查数组是否为空,LLM 响应处理,添加数组长度检查
+bailian.py,136-152,stream_chat,异常处理,中,流式解析错误被忽略,流式输出,记录 JSON 解析错误
+bailian.py,154-164,health_check,异常处理,低,异常被吞没无日志,健康检查,添加日志记录
+ollama.py,66-79,chat,空值检查,高,message 为 None 时调用 get(),LLM 响应处理,在调用 get() 前检查 message
+ollama.py,124-129,stream_chat,空值检查,高,流式响应中 message 为 None,流式输出,在调用 get() 前检查 message
+ollama.py,162,pull_model,配置,低,超时过长且无进度报告,模型下载,添加进度回调或分段超时
+chat_widget.py,150,new_session,异步任务,高,create_task 没有存储引用,会话创建,存储任务引用或添加完成回调
+chat_widget.py,145-148,new_session,布局操作,中,messages_layout.count() 逻辑错误,消息清空,重构布局清理逻辑
+chat_widget.py,185,_on_send_clicked,空值检查,高,findChild() 可能返回 None,消息气泡更新,检查 findChild 返回值
+chat_widget.py,168-196,_on_send_clicked,异常处理,高,流式更新中无保护,消息发送,在 setText 前检查 None
+chat_widget.py,121-136,eventFilter,事件处理,低,eventFilter 无异常处理,键盘事件处理,添加 try-catch
+scheduler.py,54,start,异步任务,高,_main_loop 任务没有存储引用,调度器启动,存储任务引用
+scheduler.py,90,_schedule_task,异步任务,高,_interval_task 任务没有存储引用,间隔任务调度,存储任务引用
+scheduler.py,96,_schedule_task,异步任务,高,_execute_automation_task 任务没有存储引用,一次性任务调度,存储任务引用
+scheduler.py,62-63,stop,异常处理,低,task.cancel() 无异常处理,调度器停止,添加 try-except
+scheduler.py,98-116,_interval_task,数据库,中,异常时缺少重试逻辑,间隔任务执行,改进异常处理和重试
+全局,所有异步函数,N/A,异常处理,高,create_task 无全局异常处理,所有异步操作,添加 add_done_callback
+全局,所有 DB 操作,N/A,事务管理,高,commit() 失败时无异常处理,所有数据库操作,统一异常处理模式
+全局,所有 Provider 调用,N/A,空值检查,高,返回值为 None 不检查,所有 LLM 调用,检查 is not None

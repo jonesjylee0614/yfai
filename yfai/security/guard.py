@@ -57,8 +57,9 @@ class ApprovalResult(BaseModel):
 class SecurityGuard:
     """安全守卫"""
 
-    def __init__(self, config: Dict[str, Any]):
+    def __init__(self, config: Dict[str, Any], db_manager=None):
         self.config = config
+        self.db_manager = db_manager
         self.confirm_threshold = self._parse_threshold(
             config.get("security", {}).get("confirm_threshold", "medium")
         )
@@ -70,7 +71,7 @@ class SecurityGuard:
             None
         )
 
-        # 审批记录
+        # 审批记录(内存缓存)
         self.approval_history: list[ApprovalResult] = []
 
     def apply_config(self, config: Dict[str, Any]) -> None:
@@ -168,9 +169,23 @@ class SecurityGuard:
         Returns:
             ApprovalResult: 审批结果
         """
+        import inspect
+
         # 如果设置了回调函数,调用它
         if self.approval_callback:
-            result = self.approval_callback(request)
+            try:
+                # 检查回调函数是否是异步的
+                if inspect.iscoroutinefunction(self.approval_callback):
+                    result = await self.approval_callback(request)
+                else:
+                    result = self.approval_callback(request)
+            except Exception as e:
+                # 回调函数执行失败,默认拒绝
+                result = ApprovalResult(
+                    request_id=request.id,
+                    status=ApprovalStatus.REJECTED,
+                    reason=f"审批回调执行失败: {str(e)}",
+                )
         else:
             # 默认拒绝
             result = ApprovalResult(
@@ -195,18 +210,55 @@ class SecurityGuard:
             request: 审批请求
             result: 审批结果
         """
-        # TODO: 写入数据库
+        import logging
+        import json
+
+        # 构建审计日志数据
         log_entry = {
             "timestamp": datetime.utcnow().isoformat(),
             "request_id": request.id,
             "tool_name": request.tool_name,
             "tool_type": request.tool_type,
-            "risk_level": request.risk_level,
-            "status": result.status,
+            "risk_level": request.risk_level.value if hasattr(request.risk_level, 'value') else str(request.risk_level),
+            "status": result.status.value if hasattr(result.status, 'value') else str(result.status),
             "approved_by": result.approved_by,
             "reason": result.reason,
         }
-        print(f"[AUDIT] {log_entry}")
+
+        # 打印到控制台
+        logging.info(f"[AUDIT] {log_entry}")
+
+        # 写入数据库
+        if self.db_manager:
+            try:
+                from yfai.store.db import AuditLog
+
+                with self.db_manager.get_session() as db_session:
+                    audit_log = AuditLog(
+                        id=str(uuid.uuid4()),
+                        action_type="approval_decision",
+                        tool_name=request.tool_name,
+                        risk_level=request.risk_level.value if hasattr(request.risk_level, 'value') else str(request.risk_level),
+                        approval_status=result.status.value if hasattr(result.status, 'value') else str(result.status),
+                        request_data=json.dumps({
+                            "tool_type": request.tool_type,
+                            "params": request.params,
+                            "source": request.source,
+                            "description": request.description,
+                            "impact": request.impact,
+                        }, ensure_ascii=False),
+                        result_data=json.dumps({
+                            "approved_by": result.approved_by,
+                            "reason": result.reason,
+                            "decided_at": result.decided_at.isoformat() if result.decided_at else None,
+                        }, ensure_ascii=False),
+                        session_id=None,  # 如果有会话ID可以在这里设置
+                    )
+                    db_session.add(audit_log)
+                    db_session.commit()
+            except Exception as e:
+                # 审计日志失败不应影响主流程,只记录警告
+                logging.warning(f"Failed to write audit log to database: {e}")
 
     def redact_sensitive_info(self, text: str) -> str:
         """脱敏敏感信息

@@ -63,7 +63,14 @@ class OllamaProvider(BaseProvider):
             result = response.json()
 
         # 解析响应
-        message = result.get("message", {})
+        # 验证响应结构
+        if not isinstance(result, dict):
+            raise ValueError(f"无效的响应格式: {type(result)}")
+
+        message = result.get("message")
+        if not message or not isinstance(message, dict):
+            raise ValueError(f"无效的message格式: {type(message)}")
+
         return ChatResponse(
             content=message.get("content", ""),
             role=message.get("role", "assistant"),
@@ -119,22 +126,28 @@ class OllamaProvider(BaseProvider):
                     if line:
                         try:
                             import json
+                            import logging
 
                             chunk = json.loads(line)
-                            message = chunk.get("message", {})
-                            content = message.get("content", "")
-                            if content:
-                                yield content
-                        except json.JSONDecodeError:
+                            message = chunk.get("message")
+                            if message and isinstance(message, dict):
+                                content = message.get("content", "")
+                                if content:
+                                    yield content
+                        except json.JSONDecodeError as e:
+                            logging.warning(f"流式响应JSON解析失败: {e}, 数据: {line[:100]}")
                             continue
 
     async def health_check(self) -> bool:
         """健康检查"""
+        import logging
+
         try:
             async with httpx.AsyncClient(timeout=5) as client:
                 response = await client.get(f"{self.api_base}/api/tags")
                 return response.status_code == 200
-        except Exception:
+        except Exception as e:
+            logging.warning(f"Ollama健康检查失败: {e}")
             return False
 
     async def list_models(self) -> List[str]:
